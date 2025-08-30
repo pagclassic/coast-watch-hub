@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,35 @@ const createHazardIcon = (severity: number, type: string) => {
     iconAnchor: [16, 32],
     popupAnchor: [0, -32],
   });
+};
+
+// Get hazard area color and radius based on severity
+const getHazardAreaStyle = (severity: number) => {
+  if (severity >= 4) {
+    return {
+      color: '#dc2626',
+      fillColor: '#dc2626',
+      fillOpacity: 0.25,
+      weight: 3,
+      radius: 2000 // 2km radius for critical hazards
+    };
+  } else if (severity >= 3) {
+    return {
+      color: '#ea580c',
+      fillColor: '#ea580c',
+      fillOpacity: 0.2,
+      weight: 2,
+      radius: 1500 // 1.5km radius for high hazards
+    };
+  } else {
+    return {
+      color: '#0ea5e9',
+      fillColor: '#0ea5e9',
+      fillOpacity: 0.15,
+      weight: 1,
+      radius: 1000 // 1km radius for medium-low hazards
+    };
+  }
 };
 
 interface Report {
@@ -135,6 +164,67 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
   const [reports, setReports] = useState<Report[]>([]);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showHazardAreas, setShowHazardAreas] = useState(true);
+  const [showOnlyCritical, setShowOnlyCritical] = useState(false);
+
+  // Filter reports based on critical filter
+  const filteredReports = showOnlyCritical 
+    ? reports.filter(report => report.severity >= 4)
+    : reports;
+
+  // Check for overlapping hazard areas
+  const checkOverlappingAreas = (report: Report) => {
+    const reportRadius = getHazardAreaStyle(report.severity).radius;
+    const overlapping = reports.filter(otherReport => {
+      if (otherReport.id === report.id) return false;
+      
+      const distance = Math.sqrt(
+        Math.pow(report.lat - otherReport.lat, 2) + 
+        Math.pow(report.lng - otherReport.lng, 2)
+      ) * 111000; // Convert to meters (roughly)
+      
+      const otherRadius = getHazardAreaStyle(otherReport.severity).radius;
+      return distance < (reportRadius + otherRadius);
+    });
+    
+    return overlapping.length > 0;
+  };
+
+  // Calculate total affected area
+  const calculateTotalAffectedArea = () => {
+    if (!showHazardAreas) return 0;
+    
+    let totalArea = 0;
+    const processedAreas = new Set<string>();
+    
+    filteredReports.forEach(report => {
+      const radius = getHazardAreaStyle(report.severity).radius;
+      const area = Math.PI * Math.pow(radius, 2);
+      
+      // Check for overlaps with already processed areas
+      let overlapArea = 0;
+      processedAreas.forEach(processedId => {
+        const processedReport = reports.find(r => r.id === processedId);
+        if (processedReport) {
+          const distance = Math.sqrt(
+            Math.pow(report.lat - processedReport.lat, 2) + 
+            Math.pow(report.lng - processedReport.lng, 2)
+          ) * 111000;
+          
+          const processedRadius = getHazardAreaStyle(processedReport.severity).radius;
+          if (distance < (radius + processedRadius)) {
+            // Calculate overlap area (simplified)
+            overlapArea += Math.min(area, Math.PI * Math.pow(processedRadius, 2)) * 0.3;
+          }
+        }
+      });
+      
+      totalArea += area - overlapArea;
+      processedAreas.add(report.id);
+    });
+    
+    return totalArea;
+  };
 
   const fetchReports = async () => {
     try {
@@ -253,71 +343,149 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
           </Marker>
         )}
 
-        {/* Hazard Report Markers */}
-        {reports.map((report) => (
-          <Marker
-            key={report.id}
-            position={[report.lat, report.lng]}
-            icon={createHazardIcon(report.severity, report.type)}
-            eventHandlers={{
-              click: () => {
-                if (onMarkerClick) {
-                  onMarkerClick(report.id);
-                }
-              }
-            }}
-          >
-            <Popup maxWidth={300}>
-              <Card className="border-0 shadow-none">
-                <CardContent className="p-3 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-semibold text-sm capitalize">{report.type.replace('_', ' ')}</h3>
-                      <p className="text-xs text-muted-foreground">{formatDate(report.created_at)}</p>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      {getSeverityBadge(report.severity)}
-                      {getStatusBadge(report.status)}
-                    </div>
-                  </div>
-                  
-                  {report.notes && (
-                    <p className="text-sm text-foreground line-clamp-2">{report.notes}</p>
-                  )}
-                  
-                  {report.photo_url && (
-                    <img 
-                      src={report.photo_url} 
-                      alt="Hazard photo" 
-                      className="w-full h-24 object-cover rounded-md"
-                    />
-                  )}
-                  
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <AlertTriangle className="w-3 h-3" />
-                      <span>Severity: {report.severity}/5</span>
-                    </div>
-                    <Button 
-                      size="sm" 
-                      variant="default" 
-                      className="h-7 text-xs"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onMarkerClick) {
-                          onMarkerClick(report.id);
-                        }
-                      }}
-                    >
-                      View Details
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </Popup>
-          </Marker>
-        ))}
+                 {/* Hazard Report Markers */}
+         {filteredReports.map((report) => {
+           const areaStyle = getHazardAreaStyle(report.severity);
+           const isOverlapping = checkOverlappingAreas(report);
+           const markerStyle = isOverlapping ? {
+             color: '#f59e0b', // Yellow for overlapping
+             fillColor: '#f59e0b',
+             fillOpacity: 0.3,
+             weight: 2,
+             radius: 1000 // Smaller radius for overlapping
+           } : areaStyle;
+
+           return (
+             <React.Fragment key={report.id}>
+               {/* Hazard Area Circle */}
+               {showHazardAreas && (
+                 <Circle
+                   center={[report.lat, report.lng]}
+                   pathOptions={markerStyle}
+                   eventHandlers={{
+                     click: () => {
+                       if (onMarkerClick) {
+                         onMarkerClick(report.id);
+                       }
+                     }
+                   }}
+                 >
+                   <Popup>
+                     <div className="text-center p-2">
+                       <h4 className="font-medium text-sm capitalize mb-1">
+                         {report.type.replace('_', ' ')} Hazard Area
+                       </h4>
+                       <p className="text-xs text-muted-foreground">
+                         Severity: {report.severity}/5
+                       </p>
+                       <p className="text-xs text-muted-foreground">
+                         Radius: {(markerStyle.radius / 1000).toFixed(1)}km
+                       </p>
+                     </div>
+                   </Popup>
+                 </Circle>
+               )}
+               <Marker
+                 position={[report.lat, report.lng]}
+                 icon={createHazardIcon(report.severity, report.type)}
+                 eventHandlers={{
+                   click: () => {
+                     if (onMarkerClick) {
+                       onMarkerClick(report.id);
+                     }
+                   }
+                 }}
+               >
+                 <Popup maxWidth={300}>
+                   <Card className="border-0 shadow-none">
+                     <CardContent className="p-3 space-y-3">
+                       <div className="flex items-start justify-between">
+                         <div>
+                           <h3 className="font-semibold text-sm capitalize">{report.type.replace('_', ' ')}</h3>
+                           <p className="text-xs text-muted-foreground">{formatDate(report.created_at)}</p>
+                         </div>
+                         <div className="flex flex-col gap-1">
+                           {getSeverityBadge(report.severity)}
+                           {getStatusBadge(report.status)}
+                         </div>
+                       </div>
+                       
+                       {report.notes && (
+                         <p className="text-sm text-foreground line-clamp-2">{report.notes}</p>
+                       )}
+                       
+                       {report.photo_url && (
+                         <img 
+                           src={report.photo_url} 
+                           alt="Hazard photo" 
+                           className="w-full h-24 object-cover rounded-md"
+                         />
+                       )}
+                       
+                       <div className="flex items-center justify-between pt-2 border-t">
+                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                           <AlertTriangle className="w-3 h-3" />
+                           <span>Severity: {report.severity}/5</span>
+                         </div>
+                         <Button 
+                           size="sm" 
+                           variant="default" 
+                           className="h-7 text-xs"
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             if (onMarkerClick) {
+                               onMarkerClick(report.id);
+                             }
+                           }}
+                         >
+                           View Details
+                         </Button>
+                       </div>
+                     </CardContent>
+                   </Card>
+                 </Popup>
+               </Marker>
+             </React.Fragment>
+           );
+         })}
       </MapContainer>
+
+      {/* Hazard Summary Card */}
+      <Card className="absolute top-4 right-4 z-10 shadow-lg">
+        <CardContent className="p-3">
+          <h4 className="font-medium text-sm mb-2">Hazard Summary</h4>
+          <div className="space-y-1 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-red-600 font-medium">Critical:</span>
+              <Badge variant="destructive" className="text-xs">
+                {reports.filter(r => r.severity >= 4).length}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-orange-500 font-medium">High:</span>
+              <Badge className="bg-orange-500 text-white text-xs">
+                {reports.filter(r => r.severity === 3).length}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-blue-500 font-medium">Medium-Low:</span>
+              <Badge variant="secondary" className="text-xs">
+                {reports.filter(r => r.severity <= 2).length}
+              </Badge>
+            </div>
+            {showHazardAreas && (
+              <div className="pt-2 border-t border-border/50">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Total Area:</span>
+                  <span className="text-xs">
+                    {(calculateTotalAffectedArea() / 1000000).toFixed(1)} km²
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Floating Report Button */}
       {onReportClick && (
@@ -333,21 +501,57 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
       {/* Map Legend */}
       <Card className="absolute top-4 left-4 z-10 shadow-lg">
         <CardContent className="p-3">
-          <h4 className="font-medium text-sm mb-2">Hazard Severity</h4>
-          <div className="space-y-1 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-600"></div>
-              <span>Critical (4-5)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-              <span>High (3)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-              <span>Medium-Low (1-2)</span>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="font-medium text-sm">Hazard Severity & Areas</h4>
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant={showOnlyCritical ? "default" : "outline"}
+                onClick={() => setShowOnlyCritical(!showOnlyCritical)}
+                className="h-6 text-xs"
+              >
+                {showOnlyCritical ? "All" : "Critical Only"}
+              </Button>
+              <Button
+                size="sm"
+                variant={showHazardAreas ? "default" : "outline"}
+                onClick={() => setShowHazardAreas(!showHazardAreas)}
+                className="h-6 text-xs"
+              >
+                {showHazardAreas ? "Hide" : "Show"} Areas
+              </Button>
             </div>
           </div>
+                      <div className="space-y-2 text-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-600"></div>
+                  <span>Critical (4-5)</span>
+                </div>
+                <div className="ml-5 text-xs text-muted-foreground">2km radius area</div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                  <span>High (3)</span>
+                </div>
+                <div className="ml-5 text-xs text-muted-foreground">1.5km radius area</div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                  <span>Medium-Low (1-2)</span>
+                </div>
+                <div className="ml-5 text-xs text-muted-foreground">1km radius area</div>
+              </div>
+              <div className="pt-2 border-t border-border/50">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                  <span>Overlapping Areas</span>
+                </div>
+                <div className="ml-5 text-xs text-muted-foreground">Multiple hazards nearby</div>
+              </div>
+            </div>
         </CardContent>
       </Card>
     </div>
