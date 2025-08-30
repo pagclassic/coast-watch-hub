@@ -120,12 +120,15 @@ const LocationFinder: React.FC<{
           (position) => {
             const { latitude, longitude } = position.coords;
             try {
+              // Only set initial location, don't force re-center
               if (mapRef) {
-                mapRef.setView([latitude, longitude], 13);
+                // Just update the user location state, don't move the map
+                onLocationFound(latitude, longitude);
               } else {
+                // Only set initial view if no map ref (first load)
                 map.setView([latitude, longitude], 13);
+                onLocationFound(latitude, longitude);
               }
-              onLocationFound(latitude, longitude);
             } catch (error) {
               console.error('Error setting map view:', error);
               onLocationFound(latitude, longitude);
@@ -138,72 +141,38 @@ const LocationFinder: React.FC<{
               description: "Could not get your current location. Using default location.",
               variant: "destructive"
             });
-            // Default to San Francisco Bay
-            try {
-              if (mapRef) {
-                mapRef.setView([37.7749, -122.4194], 10);
-              } else {
+            // Default to San Francisco Bay - only on first load
+            if (!mapRef) {
+              try {
                 map.setView([37.7749, -122.4194], 10);
+              } catch (mapError) {
+                console.error('Error setting default map view:', mapError);
               }
-            } catch (mapError) {
-              console.error('Error setting default map view:', mapError);
             }
             onLocationFound(37.7749, -122.4194);
           },
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
         );
       } else {
-        // Default to San Francisco Bay
-        try {
-          if (mapRef) {
-            mapRef.setView([37.7749, -122.4194], 10);
-          } else {
+        // Default to San Francisco Bay - only on first load
+        if (!mapRef) {
+          try {
             map.setView([37.7749, -122.4194], 10);
+          } catch (mapError) {
+            console.error('Error setting default map view:', mapError);
           }
-        } catch (mapError) {
-          console.error('Error setting default map view:', mapError);
         }
         onLocationFound(37.7749, -122.4194);
       }
     };
 
-    // Add a small delay to ensure map is fully initialized
-    const timer = setTimeout(handleLocation, 100);
-
-    return () => clearTimeout(timer);
-  }, [map, onLocationFound, mapRef]);
-
-  return null;
-};
-
-// Map event handler component
-const MapEventHandler: React.FC<{ 
-  onCenterChange: (center: [number, number]) => void;
-  onZoomChange: (zoom: number) => void;
-  mapRef: L.Map | null;
-}> = ({ onCenterChange, onZoomChange, mapRef }) => {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map) return;
-
-    const handleMoveEnd = () => {
-      const center = map.getCenter();
-      onCenterChange([center.lat, center.lng]);
-    };
-
-    const handleZoomEnd = () => {
-      onZoomChange(map.getZoom());
-    };
-
-    map.on('moveend', handleMoveEnd);
-    map.on('zoomend', handleZoomEnd);
+    // Only run once on initial load
+    handleLocation();
 
     return () => {
-      map.off('moveend', handleMoveEnd);
-      map.off('zoomend', handleZoomEnd);
+      // Cleanup - no continuous updates
     };
-  }, [map, onCenterChange, onZoomChange]);
+  }, [map, onLocationFound, mapRef]); // Only run when map or mapRef changes
 
   return null;
 };
@@ -217,8 +186,6 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Array<{ lat: number; lng: number; name: string }>>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([37.7749, -122.4194]);
-  const [mapZoom, setMapZoom] = useState(10);
   const [mapRef, setMapRef] = useState<L.Map | null>(null);
 
   // Filter reports based on critical filter
@@ -352,28 +319,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
     }
   };
 
-  // Debug map interactions
-  useEffect(() => {
-    if (mapRef) {
-      console.log('Map initialized, checking interactions...');
-      
-      // Ensure all interactions are enabled
-      mapRef.dragging.enable();
-      mapRef.touchZoom.enable();
-      mapRef.scrollWheelZoom.enable();
-      mapRef.doubleClickZoom.enable();
-      mapRef.boxZoom.enable();
-      mapRef.keyboard.enable();
-      
-      // Add event listeners for debugging
-      mapRef.on('zoomstart', () => console.log('Zoom started'));
-      mapRef.on('zoomend', () => console.log('Zoom ended'));
-      mapRef.on('movestart', () => console.log('Move started'));
-      mapRef.on('moveend', () => console.log('Move ended'));
-      
-      console.log('Map interactions enabled and event listeners added');
-    }
-  }, [mapRef]);
+
 
   const fetchReports = async () => {
     try {
@@ -609,23 +555,15 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
           boxZoom={true}
           keyboard={true}
           ref={(map) => {
-            console.log('Map ref set:', map);
             setMapRef(map);
             if (map) {
-              // Force enable all interactions
+              // Ensure all interactions are enabled
               map.dragging.enable();
               map.touchZoom.enable();
               map.scrollWheelZoom.enable();
               map.doubleClickZoom.enable();
               map.boxZoom.enable();
               map.keyboard.enable();
-              
-              // Add event listeners
-              map.on('zoomstart', () => console.log('User zooming...'));
-              map.on('movestart', () => console.log('User moving map...'));
-              map.on('click', (e) => console.log('Map clicked at:', e.latlng));
-              
-              console.log('Map fully initialized and interactive');
             }
           }}
         >
@@ -962,8 +900,8 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
       <Card className="absolute bottom-4 left-4 z-10 shadow-lg">
         <CardContent className="p-2">
           <div className="text-xs text-muted-foreground">
-            <div>Center: {mapCenter[0].toFixed(4)}, {mapCenter[1].toFixed(4)}</div>
-            <div>Zoom: {mapZoom}</div>
+            <div>Center: {mapRef?.getCenter().lat.toFixed(4)}, {mapRef?.getCenter().lng.toFixed(4)}</div>
+            <div>Zoom: {mapRef?.getZoom()}</div>
           </div>
         </CardContent>
       </Card>
