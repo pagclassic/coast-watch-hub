@@ -352,6 +352,29 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
     }
   };
 
+  // Debug map interactions
+  useEffect(() => {
+    if (mapRef) {
+      console.log('Map initialized, checking interactions...');
+      
+      // Ensure all interactions are enabled
+      mapRef.dragging.enable();
+      mapRef.touchZoom.enable();
+      mapRef.scrollWheelZoom.enable();
+      mapRef.doubleClickZoom.enable();
+      mapRef.boxZoom.enable();
+      mapRef.keyboard.enable();
+      
+      // Add event listeners for debugging
+      mapRef.on('zoomstart', () => console.log('Zoom started'));
+      mapRef.on('zoomend', () => console.log('Zoom ended'));
+      mapRef.on('movestart', () => console.log('Move started'));
+      mapRef.on('moveend', () => console.log('Move ended'));
+      
+      console.log('Map interactions enabled and event listeners added');
+    }
+  }, [mapRef]);
+
   const fetchReports = async () => {
     try {
       const { data, error } = await supabase
@@ -442,6 +465,45 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
 
   return (
     <div className="relative h-full w-full">
+      {/* Test Map Interaction Button */}
+      <Card className="absolute top-20 left-4 z-20 shadow-lg">
+        <CardContent className="p-3">
+          <Button
+            size="sm"
+            onClick={() => {
+              if (mapRef) {
+                console.log('Test button clicked, current map state:', {
+                  center: mapRef.getCenter(),
+                  zoom: mapRef.getZoom(),
+                  dragging: mapRef.dragging.enabled(),
+                  scrollWheelZoom: mapRef.scrollWheelZoom.enabled(),
+                  touchZoom: mapRef.touchZoom.enabled()
+                });
+                
+                // Test zoom
+                const currentZoom = mapRef.getZoom();
+                mapRef.setZoom(currentZoom + 1);
+                
+                toast({
+                  title: "Map Test",
+                  description: `Zoomed from ${currentZoom} to ${currentZoom + 1}`,
+                });
+              } else {
+                console.log('Map ref is null');
+                toast({
+                  title: "Map Error",
+                  description: "Map reference is not available",
+                  variant: "destructive"
+                });
+              }
+            }}
+            className="w-full"
+          >
+            Test Map Interaction
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Search Interface */}
       <Card className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 shadow-lg w-80">
         <CardContent className="p-3">
@@ -496,157 +558,177 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
         </CardContent>
       </Card>
 
-      {/* Map Container */}
-      <MapContainer
-        center={mapCenter}
-        zoom={mapZoom}
-        style={{ height: '100%', width: '100%' }}
-        className="z-0"
-        key="main-map"
-        zoomControl={false}
-        minZoom={3}
-        maxZoom={18}
-        ref={setMapRef}
-        doubleClickZoom={true}
-        scrollWheelZoom={true}
-        dragging={true}
-        touchZoom={true}
-        boxZoom={true}
-        keyboard={true}
+      {/* Map Container - Simplified for debugging */}
+      <div 
+        className="h-full w-full" 
+        style={{ 
+          position: 'relative',
+          zIndex: 1,
+          pointerEvents: 'auto'
+        }}
       >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-        
-        <LocationFinder onLocationFound={handleLocationFound} mapRef={mapRef} />
-        <MapEventHandler 
-          onCenterChange={setMapCenter}
-          onZoomChange={setMapZoom}
-          mapRef={mapRef}
-        />
-        
-        {/* Zoom Controls */}
-        <ZoomControl position="bottomright" />
-        
-        {/* User Location Marker */}
-        {userLocation && (
-          <Marker position={userLocation} icon={createDefaultIcon()}>
-            <Popup>
-              <div className="text-center">
-                <MapPin className="w-4 h-4 mx-auto mb-1 text-primary" />
-                <p className="font-medium">Your Location</p>
-              </div>
-            </Popup>
-          </Marker>
-        )}
+        <MapContainer
+          center={[37.7749, -122.4194]}
+          zoom={10}
+          style={{ 
+            height: '100%', 
+            width: '100%',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            zIndex: 1,
+            pointerEvents: 'auto'
+          }}
+          zoomControl={true}
+          minZoom={3}
+          maxZoom={18}
+          doubleClickZoom={true}
+          scrollWheelZoom={true}
+          dragging={true}
+          touchZoom={true}
+          boxZoom={true}
+          keyboard={true}
+          ref={(map) => {
+            console.log('Map ref set:', map);
+            setMapRef(map);
+            if (map) {
+              // Force map to be interactive
+              map.dragging.enable();
+              map.touchZoom.enable();
+              map.scrollWheelZoom.enable();
+              map.doubleClickZoom.enable();
+              map.boxZoom.enable();
+              map.keyboard.enable();
+              console.log('Map interactions enabled');
+            }
+          }}
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          />
+          
+          <LocationFinder onLocationFound={handleLocationFound} mapRef={mapRef} />
+          
+          {/* User Location Marker */}
+          {userLocation && (
+            <Marker position={userLocation} icon={createDefaultIcon()}>
+              <Popup>
+                <div className="text-center">
+                  <MapPin className="w-4 h-4 mx-auto mb-1 text-primary" />
+                  <p className="font-medium">Your Location</p>
+                </div>
+              </Popup>
+            </Marker>
+          )}
 
-                 {/* Hazard Report Markers */}
-         {filteredReports.map((report) => {
-           const areaStyle = getHazardAreaStyle(report.severity);
-           const isOverlapping = checkOverlappingAreas(report);
-           const markerStyle = isOverlapping ? {
-             color: '#f59e0b', // Yellow for overlapping
-             fillColor: '#f59e0b',
-             fillOpacity: 0.3,
-             weight: 2,
-             radius: 1000 // Smaller radius for overlapping
-           } : areaStyle;
+          {/* Hazard Report Markers */}
+          {filteredReports.map((report) => {
+            const areaStyle = getHazardAreaStyle(report.severity);
+            const isOverlapping = checkOverlappingAreas(report);
+            const markerStyle = isOverlapping ? {
+              color: '#f59e0b', // Yellow for overlapping
+              fillColor: '#f59e0b',
+              fillOpacity: 0.3,
+              weight: 2,
+              radius: 1000 // Smaller radius for overlapping
+            } : areaStyle;
 
-           return (
-             <React.Fragment key={report.id}>
-               {/* Hazard Area Circle */}
-               {showHazardAreas && (
-                 <Circle
-                   center={[report.lat, report.lng]}
-                   pathOptions={markerStyle}
-                   eventHandlers={{
-                     click: () => {
-                       if (onMarkerClick) {
-                         onMarkerClick(report.id);
-                       }
-                     }
-                   }}
-                 >
-                   <Popup>
-                     <div className="text-center p-2">
-                       <h4 className="font-medium text-sm capitalize mb-1">
-                         {report.type.replace('_', ' ')} Hazard Area
-                       </h4>
-                       <p className="text-xs text-muted-foreground">
-                         Severity: {report.severity}/5
-                       </p>
-                       <p className="text-xs text-muted-foreground">
-                         Radius: {(markerStyle.radius / 1000).toFixed(1)}km
-                       </p>
-                     </div>
-                   </Popup>
-                 </Circle>
-               )}
-               <Marker
-                 position={[report.lat, report.lng]}
-                 icon={createHazardIcon(report.severity, report.type)}
-                 eventHandlers={{
-                   click: () => {
-                     if (onMarkerClick) {
-                       onMarkerClick(report.id);
-                     }
-                   }
-                 }}
-               >
-                 <Popup maxWidth={300}>
-                   <Card className="border-0 shadow-none">
-                     <CardContent className="p-3 space-y-3">
-                       <div className="flex items-start justify-between">
-                         <div>
-                           <h3 className="font-semibold text-sm capitalize">{report.type.replace('_', ' ')}</h3>
-                           <p className="text-xs text-muted-foreground">{formatDate(report.created_at)}</p>
-                         </div>
-                         <div className="flex flex-col gap-1">
-                           {getSeverityBadge(report.severity)}
-                           {getStatusBadge(report.status)}
-                         </div>
-                       </div>
-                       
-                       {report.notes && (
-                         <p className="text-sm text-foreground line-clamp-2">{report.notes}</p>
-                       )}
-                       
-                       {report.photo_url && (
-                         <img 
-                           src={report.photo_url} 
-                           alt="Hazard photo" 
-                           className="w-full h-24 object-cover rounded-md"
-                         />
-                       )}
-                       
-                       <div className="flex items-center justify-between pt-2 border-t">
-                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                           <AlertTriangle className="w-3 h-3" />
-                           <span>Severity: {report.severity}/5</span>
-                         </div>
-                         <Button 
-                           size="sm" 
-                           variant="default" 
-                           className="h-7 text-xs"
-                           onClick={(e) => {
-                             e.stopPropagation();
-                             if (onMarkerClick) {
-                               onMarkerClick(report.id);
-                             }
-                           }}
-                         >
-                           View Details
-                         </Button>
-                       </div>
-                     </CardContent>
-                   </Card>
-                 </Popup>
-               </Marker>
-             </React.Fragment>
-           );
-         })}
-      </MapContainer>
+            return (
+              <React.Fragment key={report.id}>
+                {/* Hazard Area Circle */}
+                {showHazardAreas && (
+                  <Circle
+                    center={[report.lat, report.lng]}
+                    pathOptions={markerStyle}
+                    eventHandlers={{
+                      click: () => {
+                        if (onMarkerClick) {
+                          onMarkerClick(report.id);
+                        }
+                      }
+                    }}
+                  >
+                    <Popup>
+                      <div className="text-center p-2">
+                        <h4 className="font-medium text-sm capitalize mb-1">
+                          {report.type.replace('_', ' ')} Hazard Area
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          Severity: {report.severity}/5
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Radius: {(markerStyle.radius / 1000).toFixed(1)}km
+                        </p>
+                      </div>
+                    </Popup>
+                  </Circle>
+                )}
+                <Marker
+                  position={[report.lat, report.lng]}
+                  icon={createHazardIcon(report.severity, report.type)}
+                  eventHandlers={{
+                    click: () => {
+                      if (onMarkerClick) {
+                        onMarkerClick(report.id);
+                      }
+                    }
+                  }}
+                >
+                  <Popup maxWidth={300}>
+                    <Card className="border-0 shadow-none">
+                      <CardContent className="p-3 space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="font-semibold text-sm capitalize">{report.type.replace('_', ' ')}</h3>
+                            <p className="text-xs text-muted-foreground">{formatDate(report.created_at)}</p>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            {getSeverityBadge(report.severity)}
+                            {getStatusBadge(report.status)}
+                          </div>
+                        </div>
+                        
+                        {report.notes && (
+                          <p className="text-sm text-foreground line-clamp-2">{report.notes}</p>
+                        )}
+                        
+                        {report.photo_url && (
+                          <img 
+                            src={report.photo_url} 
+                            alt="Hazard photo" 
+                            className="w-full h-24 object-cover rounded-md"
+                          />
+                        )}
+                        
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>Severity: {report.severity}/5</span>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="default" 
+                            className="h-7 text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onMarkerClick) {
+                                onMarkerClick(report.id);
+                              }
+                            }}
+                          >
+                            View Details
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Popup>
+                </Marker>
+              </React.Fragment>
+            );
+          })}
+        </MapContainer>
+      </div>
 
       {/* Hazard Summary Card */}
       <Card className="absolute top-4 right-4 z-10 shadow-lg">
