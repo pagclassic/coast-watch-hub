@@ -187,6 +187,7 @@ const MapView: React.FC<MapViewProps> = React.memo(({ onReportClick, onMarkerCli
   const [searchResults, setSearchResults] = useState<Array<{ lat: number; lng: number; name: string }>>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [mapRef, setMapRef] = useState<L.Map | null>(null);
+  const [showLegend, setShowLegend] = useState(false);
 
   // Filter reports based on critical filter
   const filteredReports = useMemo(() => {
@@ -334,6 +335,19 @@ const MapView: React.FC<MapViewProps> = React.memo(({ onReportClick, onMarkerCli
       map.keyboard.enable();
     }
   }, []);
+
+  // Close legend dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (showLegend && !target.closest('.legend-container')) {
+        setShowLegend(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLegend]);
 
 
   const fetchReports = async () => {
@@ -775,60 +789,76 @@ const MapView: React.FC<MapViewProps> = React.memo(({ onReportClick, onMarkerCli
         </div>
       )}
 
-      {/* Map Legend */}
-      <Card className="absolute top-4 left-4 z-10 shadow-lg">
-        <CardContent className="p-3">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="font-medium text-sm">Hazard Severity & Areas</h4>
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                variant={showOnlyCritical ? "default" : "outline"}
-                onClick={() => setShowOnlyCritical(!showOnlyCritical)}
-                className="h-6 text-xs"
-              >
-                {showOnlyCritical ? "All" : "Critical Only"}
-              </Button>
-              <Button
-                size="sm"
-                variant={showHazardAreas ? "default" : "outline"}
-                onClick={() => setShowHazardAreas(!showHazardAreas)}
-                className="h-6 text-xs"
-              >
-                {showHazardAreas ? "Hide" : "Show"} Areas
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-2 text-xs">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-600"></div>
-                <span>Critical (4-5)</span>
+            {/* Map Legend - Replaced with Info Button */}
+      <Card className="absolute top-4 left-4 z-10 shadow-lg legend-container">
+        <CardContent className="p-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowLegend(!showLegend)}
+            className="h-8 w-8 p-0"
+            title="Hazard Information"
+          >
+            <AlertTriangle className="w-4 h-4" />
+          </Button>
+          
+          {/* Legend Dropdown */}
+          {showLegend && (
+            <div className="absolute top-12 left-0 bg-background border rounded-lg shadow-lg p-3 min-w-64 z-20">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium text-sm">Hazard Severity & Areas</h4>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant={showOnlyCritical ? "default" : "outline"}
+                    onClick={() => setShowOnlyCritical(!showOnlyCritical)}
+                    className="h-6 text-xs"
+                  >
+                    {showOnlyCritical ? "All" : "Critical Only"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={showHazardAreas ? "default" : "outline"}
+                    onClick={() => setShowHazardAreas(!showHazardAreas)}
+                    className="h-6 text-xs"
+                  >
+                    {showHazardAreas ? "Hide" : "Show"} Areas
+                  </Button>
+                </div>
               </div>
-              <div className="ml-5 text-xs text-muted-foreground">2km radius area</div>
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                <span>High (3)</span>
+              
+              <div className="space-y-2 text-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-600"></div>
+                    <span>Critical (4-5)</span>
+                  </div>
+                  <div className="ml-5 text-xs text-muted-foreground">2km radius area</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                    <span>High (3)</span>
+                  </div>
+                  <div className="ml-5 text-xs text-muted-foreground">1.5km radius area</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span>Medium-Low (1-2)</span>
+                  </div>
+                  <div className="ml-5 text-xs text-muted-foreground">1km radius area</div>
+                </div>
+                <div className="pt-2 border-t border-border/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <span>Overlapping Areas</span>
+                  </div>
+                  <div className="ml-5 text-xs text-muted-foreground">Multiple hazards nearby</div>
+                </div>
               </div>
-              <div className="ml-5 text-xs text-muted-foreground">1.5km radius area</div>
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                <span>Medium-Low (1-2)</span>
-              </div>
-              <div className="ml-5 text-xs text-muted-foreground">1km radius area</div>
-            </div>
-            <div className="pt-2 border-t border-border/50">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <span>Overlapping Areas</span>
-              </div>
-              <div className="ml-5 text-xs text-muted-foreground">Multiple hazards nearby</div>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
