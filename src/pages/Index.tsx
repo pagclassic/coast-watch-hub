@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import MapWrapper from '@/components/MapWrapper';
 import HazardReportForm from '@/components/HazardReportForm';
@@ -25,6 +25,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const { user, signOut } = useAuth();
@@ -35,6 +36,8 @@ const Index = () => {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [activeTab, setActiveTab] = useState('map');
+  const [reports, setReports] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const handleSignOut = async () => {
     await signOut();
@@ -63,6 +66,64 @@ const Index = () => {
   const toggleSidebar = () => {
     setShowSidebar(!showSidebar);
   };
+
+  // Fetch reports for stats
+  const fetchReports = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching reports:', error);
+      } else {
+        setReports(data || []);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Calculate stats
+  const getStats = () => {
+    if (loading) return { activeHazards: 0, communityReports: 0 };
+    
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    
+    const activeHazards = reports.filter(report => 
+      report.status !== 'invalid' && report.status !== 'resolved'
+    ).length;
+    
+    const communityReports = reports.filter(report => 
+      new Date(report.created_at) >= oneWeekAgo
+    ).length;
+    
+    return { activeHazards, communityReports };
+  };
+
+  // Fetch reports on component mount
+  useEffect(() => {
+    fetchReports();
+
+    // Subscribe to real-time updates
+    const subscription = supabase
+      .channel('dashboard_reports_channel')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'reports' },
+        () => {
+          fetchReports(); // Refetch when reports change
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -134,8 +195,12 @@ const Index = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="text-2xl font-bold text-foreground">--</div>
-                  <p className="text-xs text-muted-foreground">Loading...</p>
+                  <div className="text-2xl font-bold text-foreground">
+                    {loading ? '...' : getStats().activeHazards}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {loading ? 'Loading...' : 'Currently active'}
+                  </p>
                 </CardContent>
               </Card>
 
@@ -147,8 +212,12 @@ const Index = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="text-2xl font-bold text-foreground">--</div>
-                  <p className="text-xs text-muted-foreground">Loading...</p>
+                  <div className="text-2xl font-bold text-foreground">
+                    {loading ? '...' : getStats().communityReports}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {loading ? 'Loading...' : 'This week'}
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -196,11 +265,48 @@ const Index = () => {
             <div className="p-4 flex-1 overflow-y-auto">
               <h3 className="text-sm font-medium text-foreground mb-3">Recent Activity</h3>
               <div className="space-y-3">
-                <div className="text-center py-8 text-muted-foreground">
-                  <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No recent activity</p>
-                  <p className="text-xs">Activity will appear here as hazards are reported</p>
-                </div>
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                    <p className="text-sm">Loading activity...</p>
+                  </div>
+                ) : reports.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No recent activity</p>
+                    <p className="text-xs">Activity will appear here as hazards are reported</p>
+                  </div>
+                ) : (
+                  reports.slice(0, 5).map((report) => (
+                    <div key={report.id} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                      <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                        report.severity >= 4 ? 'bg-destructive' : 
+                        report.severity >= 3 ? 'bg-warning' : 'bg-primary'
+                      }`}></div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-foreground capitalize">
+                          {report.type.replace('_', ' ')}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(report.created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                        <Badge 
+                          variant={report.severity >= 4 ? "destructive" : 
+                                  report.severity >= 3 ? "default" : "secondary"} 
+                          className="mt-1 text-xs"
+                        >
+                          {report.severity >= 4 ? 'Critical' : 
+                           report.severity >= 3 ? 'High' : 'Medium'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
