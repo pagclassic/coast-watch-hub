@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import MapView from '@/components/MapView';
+import MapWrapper from '@/components/MapWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -191,7 +191,7 @@ const Index = () => {
 
         {/* Main Map Area */}
         <div className="flex-1 relative">
-          <MapView onReportClick={handleReportClick} />
+          <MapWrapper onReportClick={handleReportClick} />
         </div>
       </div>
     </div>

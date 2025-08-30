@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import React, { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -8,26 +8,34 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, AlertTriangle, Navigation, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
-// Fix for default markers in React Leaflet
+// Import Leaflet CSS
 import 'leaflet/dist/leaflet.css';
 
-// Fix default markers
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+// Fix default markers issue - only run in browser
+if (typeof window !== 'undefined') {
+  // Remove default icon URL getter
+  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  
+  // Set default icon options
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  });
+}
 
-const DefaultIcon = L.icon({
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+// Create default icon
+const createDefaultIcon = () => {
+  return L.icon({
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+};
 
 // Create custom hazard icons
 const createHazardIcon = (severity: number, type: string) => {
@@ -64,11 +72,12 @@ interface MapViewProps {
   onReportClick?: () => void;
 }
 
+// Location finder component
 const LocationFinder: React.FC<{ onLocationFound: (lat: number, lng: number) => void }> = ({ onLocationFound }) => {
   const map = useMap();
 
   useEffect(() => {
-    if (navigator.geolocation) {
+    if (typeof window !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
@@ -152,7 +161,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
 
   const getSeverityBadge = (severity: number) => {
     if (severity >= 4) return <Badge variant="destructive">Critical</Badge>;
-    if (severity >= 3) return <Badge className="bg-warning text-warning-foreground">High</Badge>;
+    if (severity >= 3) return <Badge className="bg-orange-500 text-white">High</Badge>;
     if (severity >= 2) return <Badge variant="secondary">Medium</Badge>;
     return <Badge variant="outline">Low</Badge>;
   };
@@ -160,7 +169,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'verified':
-        return <Badge className="bg-success text-success-foreground">Verified</Badge>;
+        return <Badge className="bg-green-500 text-white">Verified</Badge>;
       case 'invalid':
         return <Badge variant="destructive">Invalid</Badge>;
       default:
@@ -194,7 +203,8 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
       <MapContainer
         center={[37.7749, -122.4194]} // Default to San Francisco Bay
         zoom={10}
-        className="h-full w-full z-0"
+        style={{ height: '100%', width: '100%' }}
+        className="z-0"
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -205,7 +215,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
         
         {/* User Location Marker */}
         {userLocation && (
-          <Marker position={userLocation} icon={DefaultIcon}>
+          <Marker position={userLocation} icon={createDefaultIcon()}>
             <Popup>
               <div className="text-center">
                 <MapPin className="w-4 h-4 mx-auto mb-1 text-primary" />
@@ -222,7 +232,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
             position={[report.lat, report.lng]}
             icon={createHazardIcon(report.severity, report.type)}
           >
-            <Popup maxWidth={300} className="custom-popup">
+            <Popup maxWidth={300}>
               <Card className="border-0 shadow-none">
                 <CardContent className="p-3 space-y-3">
                   <div className="flex items-start justify-between">
@@ -269,27 +279,27 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
         <Button
           onClick={onReportClick}
           size="lg"
-          className="absolute bottom-6 right-6 z-10 rounded-full w-14 h-14 ocean-glow shadow-elevated ripple float"
+          className="absolute bottom-6 right-6 z-10 rounded-full w-14 h-14 bg-primary hover:bg-primary/90 shadow-lg"
         >
           <Plus className="w-6 h-6" />
         </Button>
       )}
 
       {/* Map Legend */}
-      <Card className="absolute top-4 left-4 z-10 shadow-elevated">
+      <Card className="absolute top-4 left-4 z-10 shadow-lg">
         <CardContent className="p-3">
           <h4 className="font-medium text-sm mb-2">Hazard Severity</h4>
           <div className="space-y-1 text-xs">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-destructive"></div>
+              <div className="w-3 h-3 rounded-full bg-red-600"></div>
               <span>Critical (4-5)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-warning"></div>
+              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
               <span>High (3)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-primary"></div>
+              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
               <span>Medium-Low (1-2)</span>
             </div>
           </div>
