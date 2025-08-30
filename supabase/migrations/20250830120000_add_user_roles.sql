@@ -36,45 +36,6 @@ CREATE TRIGGER update_user_roles_updated_at
   BEFORE UPDATE ON public.user_roles 
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Insert default admin user (you can change these credentials)
--- This will create a user with email: admin@oceansafety.com and password: admin123456
--- The user will have admin role and verified status
-INSERT INTO auth.users (
-  id,
-  email,
-  encrypted_password,
-  email_confirmed_at,
-  created_at,
-  updated_at,
-  raw_app_meta_data,
-  raw_user_meta_data,
-  is_super_admin,
-  confirmation_token,
-  recovery_token
-) VALUES (
-  gen_random_uuid(),
-  'admin@oceansafety.com',
-  crypt('admin123456', gen_salt('bf')),
-  NOW(),
-  NOW(),
-  NOW(),
-  '{"provider": "email", "providers": ["email"]}',
-  '{"name": "Ocean Safety Admin", "role": "admin"}',
-  false,
-  '',
-  ''
-);
-
--- Get the admin user ID and insert into user_roles
-DO $$
-DECLARE
-  admin_user_id UUID;
-BEGIN
-  SELECT id INTO admin_user_id FROM auth.users WHERE email = 'admin@oceansafety.com';
-  
-  INSERT INTO public.user_roles (user_id, role) VALUES (admin_user_id, 'admin');
-END $$;
-
 -- Grant admin user access to all reports
 CREATE POLICY "Admins can manage all reports" ON public.reports
   FOR ALL USING (
@@ -85,10 +46,25 @@ CREATE POLICY "Admins can manage all reports" ON public.reports
   );
 
 -- Grant admin user access to all report confirmations
-CREATE POLICY "Admins can manage all confirmations" ON public.user_confirmations
+CREATE POLICY "Admins can manage all confirmations" ON public.report_confirmations
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM public.user_roles 
       WHERE user_id = auth.uid() AND role = 'admin'
     )
   );
+
+-- Create function to automatically assign user role on signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.user_roles (user_id, role)
+  VALUES (new.id, 'user');
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create trigger to automatically assign user role
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
