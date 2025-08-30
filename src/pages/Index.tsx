@@ -41,7 +41,11 @@ const Index = () => {
   };
 
   const handleReportClick = () => {
+    console.log('Report button clicked!'); // Debug log
+    console.log('Current user:', user); // Debug log
+    console.log('showReportForm before:', showReportForm); // Debug log
     setShowReportForm(true);
+    console.log('showReportForm set to true'); // Debug log
   };
 
   const handleReportDetailClick = (reportId: string) => {
@@ -86,6 +90,17 @@ const Index = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Test Button - Temporary */}
+            <Button
+              onClick={() => {
+                console.log('TEST: Force opening form');
+                setShowReportForm(true);
+              }}
+              size="sm"
+              className="bg-red-500 hover:bg-red-600"
+            >
+              TEST FORM
+            </Button>
             <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
               <Navigation className="w-4 h-4" />
               <span>Welcome, {user?.email?.split('@')[0]}</span>

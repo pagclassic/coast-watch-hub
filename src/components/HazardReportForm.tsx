@@ -87,6 +87,7 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
   onClose,
   initialLocation
 }) => {
+  console.log('HazardReportForm render - isOpen:', isOpen); // Debug log
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
