@@ -24,6 +24,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const Index = () => {
   const { user, signOut } = useAuth();
@@ -247,11 +248,13 @@ const Index = () => {
             </div>
             
             <TabsContent value="map" className="flex-1 m-0">
-              <MapWrapper 
-                onReportClick={handleReportClick}
-                onMarkerClick={handleReportDetailClick}
-                onLocationChange={setUserLocation}
-              />
+              <ErrorBoundary>
+                <MapWrapper 
+                  onReportClick={handleReportClick}
+                  onMarkerClick={handleReportDetailClick}
+                  onLocationChange={setUserLocation}
+                />
+              </ErrorBoundary>
             </TabsContent>
             
             <TabsContent value="feed" className="flex-1 m-0">

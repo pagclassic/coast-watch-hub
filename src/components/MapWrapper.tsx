@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Navigation } from 'lucide-react';
+import SimpleMapView from './SimpleMapView';
 
-// Dynamic import to avoid SSR issues
-const MapView = React.lazy(() => import('./MapView'));
+// Dynamic import to avoid SSR issues - temporarily using SimpleMapView due to Leaflet issues
+// const MapView = React.lazy(() => import('./MapView'));
 
 interface MapWrapperProps {
   onReportClick?: () => void;
@@ -28,19 +29,13 @@ const MapWrapper: React.FC<MapWrapperProps> = ({ onReportClick, onMarkerClick, o
     );
   }
 
+  // Using SimpleMapView temporarily to avoid Leaflet errors
   return (
-    <React.Suspense 
-      fallback={
-        <div className="h-full flex items-center justify-center bg-muted/10">
-          <div className="text-center space-y-4">
-            <Navigation className="w-8 h-8 animate-spin text-primary mx-auto" />
-            <p className="text-muted-foreground">Loading map...</p>
-          </div>
-        </div>
-      }
-    >
-      <MapView onReportClick={onReportClick} onMarkerClick={onMarkerClick} onLocationChange={onLocationChange} />
-    </React.Suspense>
+    <SimpleMapView 
+      onReportClick={onReportClick} 
+      onMarkerClick={onMarkerClick} 
+      onLocationChange={onLocationChange}
+    />
   );
 };
 

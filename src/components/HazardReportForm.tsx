@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -40,23 +38,11 @@ import {
   AlertTriangle, 
   Camera,
   Navigation,
-  X
+  X,
+  Crosshair
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { savePendingReport, isOnline } from '@/lib/offline-storage';
-
-// Import Leaflet CSS
-import 'leaflet/dist/leaflet.css';
-
-// Fix default markers
-if (typeof window !== 'undefined') {
-  delete (L.Icon.Default.prototype as any)._getIconUrl;
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-  });
-}
 
 const reportSchema = z.object({
   type: z.string().min(1, 'Please select a hazard type'),
@@ -96,25 +82,6 @@ const severityLabels = {
   5: 'Critical'
 };
 
-const LocationPicker: React.FC<{ 
-  position: [number, number]; 
-  onPositionChange: (lat: number, lng: number) => void 
-}> = ({ position }) => {
-  return (
-    <Marker position={position}>
-      <Popup>
-        <div className="text-center">
-          <MapPin className="w-4 h-4 mx-auto mb-1 text-primary" />
-          <p className="font-medium">Report Location</p>
-          <p className="text-xs text-muted-foreground">
-            {position[0].toFixed(4)}, {position[1].toFixed(4)}
-          </p>
-        </div>
-      </Popup>
-    </Marker>
-  );
-};
-
 const HazardReportForm: React.FC<HazardReportFormProps> = ({
   isOpen,
   onClose,
@@ -124,7 +91,7 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [mapPosition, setMapPosition] = useState<[number, number]>([37.7749, -122.4194]);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const form = useForm<ReportFormData>({
     resolver: zodResolver(reportSchema),
@@ -137,7 +104,7 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
 
   useEffect(() => {
     if (initialLocation) {
-      setMapPosition([initialLocation.lat, initialLocation.lng]);
+      setCurrentLocation(initialLocation);
       form.setValue('lat', initialLocation.lat);
       form.setValue('lng', initialLocation.lng);
     } else if (navigator.geolocation) {
@@ -145,16 +112,46 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
         (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
-          setMapPosition([lat, lng]);
+          setCurrentLocation({ lat, lng });
           form.setValue('lat', lat);
           form.setValue('lng', lng);
         },
         (error) => {
           console.error('Error getting location:', error);
+          const defaultLoc = { lat: 37.7749, lng: -122.4194 };
+          setCurrentLocation(defaultLoc);
+          form.setValue('lat', defaultLoc.lat);
+          form.setValue('lng', defaultLoc.lng);
         }
       );
     }
   }, [initialLocation, form]);
+
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setCurrentLocation({ lat, lng });
+          form.setValue('lat', lat);
+          form.setValue('lng', lng);
+          toast({
+            title: "Location Updated",
+            description: "Current location has been set successfully!",
+          });
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          toast({
+            title: "Location Error",
+            description: "Could not get your current location.",
+            variant: "destructive"
+          });
+        }
+      );
+    }
+  };
 
   const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -306,12 +303,6 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
     }
   };
 
-  const handlePositionChange = (lat: number, lng: number) => {
-    setMapPosition([lat, lng]);
-    form.setValue('lat', lat);
-    form.setValue('lng', lng);
-  };
-
   const getSeverityColor = (severity: number) => {
     if (severity >= 4) return 'text-red-600';
     if (severity >= 3) return 'text-orange-500';
@@ -320,7 +311,7 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-primary" />
@@ -442,6 +433,28 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
             {/* Location */}
             <div className="space-y-3">
               <FormLabel>Location</FormLabel>
+              
+              {/* Current Location Button */}
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={getCurrentLocation}
+                  className="flex items-center gap-2"
+                >
+                  <Crosshair className="w-4 h-4" />
+                  Use Current Location
+                </Button>
+                {currentLocation && (
+                  <div className="text-xs text-muted-foreground">
+                    <MapPin className="w-3 h-3 inline mr-1" />
+                    {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
+                  </div>
+                )}
+              </div>
+
+              {/* Manual Coordinates */}
               <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
@@ -457,8 +470,10 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
                           {...field}
                           onChange={(e) => {
                             const value = parseFloat(e.target.value);
-                            field.onChange(value);
-                            setMapPosition([value, mapPosition[1]]);
+                            if (!isNaN(value)) {
+                              field.onChange(value);
+                              setCurrentLocation(prev => ({ ...prev!, lat: value }));
+                            }
                           }}
                         />
                       </FormControl>
@@ -480,8 +495,10 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
                           {...field}
                           onChange={(e) => {
                             const value = parseFloat(e.target.value);
-                            field.onChange(value);
-                            setMapPosition([mapPosition[0], value]);
+                            if (!isNaN(value)) {
+                              field.onChange(value);
+                              setCurrentLocation(prev => ({ ...prev!, lng: value }));
+                            }
                           }}
                         />
                       </FormControl>
@@ -490,30 +507,6 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
                   )}
                 />
               </div>
-              <Card>
-                <CardContent className="p-3">
-                  <div className="h-32 w-full rounded-md overflow-hidden">
-                    <MapContainer
-                      center={mapPosition}
-                      zoom={13}
-                      style={{ height: '100%', width: '100%' }}
-                    >
-                      <TileLayer
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        attribution='&copy; OpenStreetMap contributors'
-                      />
-                      <LocationPicker 
-                        position={mapPosition}
-                        onPositionChange={handlePositionChange}
-                      />
-                    </MapContainer>
-                  </div>
-                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                    <MapPin className="w-3 h-3" />
-                    <span>Location preview</span>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Notes */}
