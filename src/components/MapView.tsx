@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { supabase } from '@/integrations/supabase/client';
@@ -177,7 +177,7 @@ const LocationFinder: React.FC<{
   return null;
 };
 
-const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocationChange }) => {
+const MapView: React.FC<MapViewProps> = React.memo(({ onReportClick, onMarkerClick, onLocationChange }) => {
   const [reports, setReports] = useState<Report[]>([]);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -189,12 +189,14 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
   const [mapRef, setMapRef] = useState<L.Map | null>(null);
 
   // Filter reports based on critical filter
-  const filteredReports = showOnlyCritical 
-    ? reports.filter(report => report.severity >= 4)
-    : reports;
+  const filteredReports = useMemo(() => {
+    return showOnlyCritical 
+      ? reports.filter(report => report.severity >= 4)
+      : reports;
+  }, [reports, showOnlyCritical]);
 
   // Check for overlapping hazard areas
-  const checkOverlappingAreas = (report: Report) => {
+  const checkOverlappingAreas = useCallback((report: Report) => {
     const reportRadius = getHazardAreaStyle(report.severity).radius;
     const overlapping = reports.filter(otherReport => {
       if (otherReport.id === report.id) return false;
@@ -209,10 +211,10 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
     });
     
     return overlapping.length > 0;
-  };
+  }, [reports]);
 
   // Calculate total affected area
-  const calculateTotalAffectedArea = () => {
+  const calculateTotalAffectedArea = useCallback(() => {
     if (!showHazardAreas) return 0;
     
     let totalArea = 0;
@@ -245,10 +247,10 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
     });
     
     return totalArea;
-  };
+  }, [filteredReports, showHazardAreas, reports]);
 
   // Search for locations using OpenStreetMap Nominatim
-  const searchLocation = async (query: string) => {
+  const searchLocation = useCallback(async (query: string) => {
     if (!query.trim()) return;
     
     setIsSearching(true);
@@ -275,10 +277,10 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
     } finally {
       setIsSearching(false);
     }
-  };
+  }, []);
 
   // Handle search result selection
-  const handleSearchResultClick = (result: { lat: number; lng: number; name: string }) => {
+  const handleSearchResultClick = useCallback((result: { lat: number; lng: number; name: string }) => {
     moveMapTo(result.lat, result.lng, 13);
     setSearchResults([]);
     setSearchQuery('');
@@ -287,16 +289,16 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
       title: "Location Found",
       description: `Navigating to ${result.name}`,
     });
-  };
+  }, []);
 
   // Clear search
-  const clearSearch = () => {
+  const clearSearch = useCallback(() => {
     setSearchQuery('');
     setSearchResults([]);
-  };
+  }, []);
 
   // Return to user location
-  const returnToUserLocation = () => {
+  const returnToUserLocation = useCallback(() => {
     if (userLocation && mapRef) {
       mapRef.setView(userLocation, 13);
       toast({
@@ -310,15 +312,28 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
         variant: "destructive"
       });
     }
-  };
+  }, [userLocation, mapRef]);
 
   // Programmatically move map to a new location
-  const moveMapTo = (lat: number, lng: number, zoom: number = 13) => {
+  const moveMapTo = useCallback((lat: number, lng: number, zoom: number = 13) => {
     if (mapRef) {
       mapRef.setView([lat, lng], zoom, { animate: true });
     }
-  };
+  }, [mapRef]);
 
+  // Map ref callback
+  const handleMapRef = useCallback((map: L.Map | null) => {
+    setMapRef(map);
+    if (map) {
+      // Ensure all interactions are enabled
+      map.dragging.enable();
+      map.touchZoom.enable();
+      map.scrollWheelZoom.enable();
+      map.doubleClickZoom.enable();
+      map.boxZoom.enable();
+      map.keyboard.enable();
+    }
+  }, []);
 
 
   const fetchReports = async () => {
@@ -539,6 +554,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
         }}
       >
         <MapContainer
+          key="stable-map"
           center={[37.7749, -122.4194]}
           zoom={10}
           style={{ 
@@ -554,18 +570,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
           touchZoom={true}
           boxZoom={true}
           keyboard={true}
-          ref={(map) => {
-            setMapRef(map);
-            if (map) {
-              // Ensure all interactions are enabled
-              map.dragging.enable();
-              map.touchZoom.enable();
-              map.scrollWheelZoom.enable();
-              map.doubleClickZoom.enable();
-              map.boxZoom.enable();
-              map.keyboard.enable();
-            }
-          }}
+          ref={handleMapRef}
         >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -907,6 +912,6 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
       </Card>
     </div>
   );
-};
+});
 
 export default MapView;
