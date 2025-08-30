@@ -451,44 +451,7 @@ const MapView: React.FC<MapViewProps> = React.memo(({ onReportClick, onMarkerCli
 
   return (
     <div className="relative h-full w-full">
-      {/* Test Map Interaction Button */}
-      <Card className="absolute top-20 left-4 z-20 shadow-lg">
-        <CardContent className="p-3">
-          <Button
-            size="sm"
-            onClick={() => {
-              if (mapRef) {
-                console.log('Test button clicked, current map state:', {
-                  center: mapRef.getCenter(),
-                  zoom: mapRef.getZoom(),
-                  dragging: mapRef.dragging.enabled(),
-                  scrollWheelZoom: mapRef.scrollWheelZoom.enabled(),
-                  touchZoom: mapRef.touchZoom.enabled()
-                });
-                
-                // Test zoom
-                const currentZoom = mapRef.getZoom();
-                mapRef.setZoom(currentZoom + 1);
-                
-                toast({
-                  title: "Map Test",
-                  description: `Zoomed from ${currentZoom} to ${currentZoom + 1}`,
-                });
-              } else {
-                console.log('Map ref is null');
-                toast({
-                  title: "Map Error",
-                  description: "Map reference is not available",
-                  variant: "destructive"
-                });
-              }
-            }}
-            className="w-full"
-          >
-            Test Map Interaction
-          </Button>
-        </CardContent>
-      </Card>
+
 
       {/* Search Interface */}
       <Card className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 shadow-lg w-80">
@@ -901,15 +864,7 @@ const MapView: React.FC<MapViewProps> = React.memo(({ onReportClick, onMarkerCli
         </CardContent>
       </Card>
 
-      {/* Current Location Info */}
-      <Card className="absolute bottom-4 left-4 z-10 shadow-lg">
-        <CardContent className="p-2">
-          <div className="text-xs text-muted-foreground">
-            <div>Center: {mapRef?.getCenter().lat.toFixed(4)}, {mapRef?.getCenter().lng.toFixed(4)}</div>
-            <div>Zoom: {mapRef?.getZoom()}</div>
-          </div>
-        </CardContent>
-      </Card>
+
     </div>
   );
 });

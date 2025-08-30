@@ -90,17 +90,6 @@ const Index = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Test Button - Temporary */}
-            <Button
-              onClick={() => {
-                console.log('TEST: Force opening form');
-                setShowReportForm(true);
-              }}
-              size="sm"
-              className="bg-red-500 hover:bg-red-600"
-            >
-              TEST FORM
-            </Button>
             <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
               <Navigation className="w-4 h-4" />
               <span>Welcome, {user?.email?.split('@')[0]}</span>
@@ -145,8 +134,8 @@ const Index = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="text-2xl font-bold text-foreground">12</div>
-                  <p className="text-xs text-muted-foreground">In your area</p>
+                  <div className="text-2xl font-bold text-foreground">--</div>
+                  <p className="text-xs text-muted-foreground">Loading...</p>
                 </CardContent>
               </Card>
 
@@ -158,8 +147,8 @@ const Index = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="text-2xl font-bold text-foreground">48</div>
-                  <p className="text-xs text-muted-foreground">This week</p>
+                  <div className="text-2xl font-bold text-foreground">--</div>
+                  <p className="text-xs text-muted-foreground">Loading...</p>
                 </CardContent>
               </Card>
             </div>
@@ -207,31 +196,10 @@ const Index = () => {
             <div className="p-4 flex-1 overflow-y-auto">
               <h3 className="text-sm font-medium text-foreground mb-3">Recent Activity</h3>
               <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                  <div className="w-2 h-2 bg-destructive rounded-full mt-2 flex-shrink-0"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-foreground">Oil Spill Reported</p>
-                    <p className="text-xs text-muted-foreground">Marina District • 2 hours ago</p>
-                    <Badge variant="destructive" className="mt-1 text-xs">Critical</Badge>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                  <div className="w-2 h-2 bg-warning rounded-full mt-2 flex-shrink-0"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-foreground">Strong Currents</p>
-                    <p className="text-xs text-muted-foreground">Bay Bridge Area • 4 hours ago</p>
-                    <Badge className="mt-1 text-xs bg-warning text-warning-foreground">High</Badge>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                  <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-foreground">Debris Spotted</p>
-                    <p className="text-xs text-muted-foreground">Golden Gate • 6 hours ago</p>
-                    <Badge variant="secondary" className="mt-1 text-xs">Medium</Badge>
-                  </div>
+                <div className="text-center py-8 text-muted-foreground">
+                  <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No recent activity</p>
+                  <p className="text-xs">Activity will appear here as hazards are reported</p>
                 </div>
               </div>
             </div>
