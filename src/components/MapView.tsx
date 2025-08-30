@@ -452,6 +452,31 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
     });
   };
 
+  // Check if a location is within reporting distance of user
+  const isWithinReportingDistance = (lat: number, lng: number) => {
+    if (!userLocation) return false;
+    
+    const distance = Math.sqrt(
+      Math.pow(lat - userLocation[0], 2) + 
+      Math.pow(lng - userLocation[1], 2)
+    ) * 111000; // Convert to meters
+    
+    // Allow reporting within 5km of user location
+    return distance <= 5000;
+  };
+
+  // Get distance from user location
+  const getDistanceFromUser = (lat: number, lng: number) => {
+    if (!userLocation) return null;
+    
+    const distance = Math.sqrt(
+      Math.pow(lat - userLocation[0], 2) + 
+      Math.pow(lng - userLocation[1], 2)
+    ) * 111000; // Convert to meters
+    
+    return distance;
+  };
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-muted/10">
@@ -558,13 +583,13 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
         </CardContent>
       </Card>
 
-      {/* Map Container - Simplified for debugging */}
+      {/* Map Container - Fixed for full interactivity */}
       <div 
+        id="map-container"
         className="h-full w-full" 
         style={{ 
           position: 'relative',
-          zIndex: 1,
-          pointerEvents: 'auto'
+          zIndex: 1
         }}
       >
         <MapContainer
@@ -572,12 +597,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
           zoom={10}
           style={{ 
             height: '100%', 
-            width: '100%',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            zIndex: 1,
-            pointerEvents: 'auto'
+            width: '100%'
           }}
           zoomControl={true}
           minZoom={3}
@@ -592,14 +612,20 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
             console.log('Map ref set:', map);
             setMapRef(map);
             if (map) {
-              // Force map to be interactive
+              // Force enable all interactions
               map.dragging.enable();
               map.touchZoom.enable();
               map.scrollWheelZoom.enable();
               map.doubleClickZoom.enable();
               map.boxZoom.enable();
               map.keyboard.enable();
-              console.log('Map interactions enabled');
+              
+              // Add event listeners
+              map.on('zoomstart', () => console.log('User zooming...'));
+              map.on('movestart', () => console.log('User moving map...'));
+              map.on('click', (e) => console.log('Map clicked at:', e.latlng));
+              
+              console.log('Map fully initialized and interactive');
             }
           }}
         >
@@ -610,16 +636,43 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
           
           <LocationFinder onLocationFound={handleLocationFound} mapRef={mapRef} />
           
-          {/* User Location Marker */}
+          {/* User Location Marker and Reporting Area */}
           {userLocation && (
-            <Marker position={userLocation} icon={createDefaultIcon()}>
-              <Popup>
-                <div className="text-center">
-                  <MapPin className="w-4 h-4 mx-auto mb-1 text-primary" />
-                  <p className="font-medium">Your Location</p>
-                </div>
-              </Popup>
-            </Marker>
+            <>
+              {/* User's reporting area (5km radius) */}
+              <Circle
+                center={userLocation}
+                pathOptions={{
+                  color: '#10b981',
+                  fillColor: '#10b981',
+                  fillOpacity: 0.1,
+                  weight: 2,
+                  radius: 5000
+                }}
+              >
+                <Popup>
+                  <div className="text-center p-2">
+                    <h4 className="font-medium text-sm mb-1">Your Reporting Area</h4>
+                    <p className="text-xs text-muted-foreground">
+                      You can report hazards within this 5km area
+                    </p>
+                  </div>
+                </Popup>
+              </Circle>
+              
+              {/* User location marker */}
+              <Marker position={userLocation} icon={createDefaultIcon()}>
+                <Popup>
+                  <div className="text-center">
+                    <MapPin className="w-4 h-4 mx-auto mb-1 text-primary" />
+                    <p className="font-medium">Your Location</p>
+                    <p className="text-xs text-muted-foreground">
+                      Report hazards from here
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            </>
           )}
 
           {/* Hazard Report Markers */}
@@ -702,9 +755,22 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
                         )}
                         
                         <div className="flex items-center justify-between pt-2 border-t">
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <AlertTriangle className="w-3 h-3" />
-                            <span>Severity: {report.severity}/5</span>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <AlertTriangle className="w-3 h-3" />
+                              <span>Severity: {report.severity}/5</span>
+                            </div>
+                            {userLocation && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <MapPin className="w-3 h-3" />
+                                <span>
+                                  {getDistanceFromUser(report.lat, report.lng)?.toFixed(1)}km away
+                                </span>
+                                {isWithinReportingDistance(report.lat, report.lng) && (
+                                  <Badge variant="outline" className="text-xs">Nearby</Badge>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <Button 
                             size="sm" 
@@ -767,15 +833,40 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
         </CardContent>
       </Card>
 
+      {/* User Location Indicator */}
+      {userLocation && (
+        <Card className="absolute bottom-6 left-6 z-20 shadow-lg">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              <div className="text-xs">
+                <div className="font-medium text-green-600">Your Location</div>
+                <div className="text-muted-foreground">
+                  {userLocation[0].toFixed(4)}, {userLocation[1].toFixed(4)}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Floating Report Button */}
       {onReportClick && (
-        <Button
-          onClick={onReportClick}
-          size="lg"
-          className="absolute bottom-6 right-6 z-10 rounded-full w-14 h-14 bg-primary hover:bg-primary/90 shadow-lg"
-        >
-          <Plus className="w-6 h-6" />
-        </Button>
+        <div className="absolute bottom-6 right-6 z-20">
+          <Button
+            onClick={onReportClick}
+            size="lg"
+            className="rounded-full w-14 h-14 bg-primary hover:bg-primary/90 shadow-lg"
+            title="Report Hazard (Only from your current location)"
+          >
+            <Plus className="w-6 h-6" />
+          </Button>
+          {userLocation && (
+            <div className="mt-2 text-xs text-center text-muted-foreground bg-background/80 px-2 py-1 rounded">
+              Report from your location only
+            </div>
+          )}
+        </div>
       )}
 
       {/* Map Legend */}

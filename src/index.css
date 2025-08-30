@@ -2,6 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Force Leaflet map to be fully interactive */
+.leaflet-container {
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  user-select: none !important;
+}
+
+.leaflet-map-pane,
+.leaflet-tile-pane,
+.leaflet-overlay-pane,
+.leaflet-marker-pane,
+.leaflet-shadow-pane,
+.leaflet-tooltip-pane,
+.leaflet-popup-pane {
+  pointer-events: auto !important;
+}
+
+.leaflet-zoom-animated {
+  pointer-events: auto !important;
+}
+
+/* Ensure map container is interactive */
+#map-container {
+  pointer-events: auto !important;
+}
+
+#map-container .leaflet-container {
+  pointer-events: auto !important;
+}
+
 @layer base {
   :root {
     /* Maritime Color Palette */
