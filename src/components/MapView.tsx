@@ -64,7 +64,7 @@ interface MapViewProps {
   onReportClick?: () => void;
 }
 
-const LocationFinder: React.FC<{ onLocationFound: (lat: number, lng: number) => void }> = ({ onLocationFound }) => {
+const LocationFinder = ({ onLocationFound }: { onLocationFound: (lat: number, lng: number) => void }) => {
   const map = useMap();
 
   useEffect(() => {
@@ -192,7 +192,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
     <div className="relative h-full w-full">
       {/* Map Container */}
       <MapContainer
-        center={[37.7749, -122.4194]} // Default to San Francisco Bay
+        center={[37.7749, -122.4194]}
         zoom={10}
         className="h-full w-full z-0"
       >
@@ -203,7 +203,6 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
         
         <LocationFinder onLocationFound={handleLocationFound} />
         
-        {/* User Location Marker */}
         {userLocation && (
           <Marker position={userLocation} icon={DefaultIcon}>
             <Popup>
@@ -215,14 +214,13 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
           </Marker>
         )}
 
-        {/* Hazard Report Markers */}
         {reports.map((report) => (
           <Marker
             key={report.id}
             position={[report.lat, report.lng]}
             icon={createHazardIcon(report.severity, report.type)}
           >
-            <Popup maxWidth={300} className="custom-popup">
+            <Popup maxWidth={300}>
               <Card className="border-0 shadow-none">
                 <CardContent className="p-3 space-y-3">
                   <div className="flex items-start justify-between">
