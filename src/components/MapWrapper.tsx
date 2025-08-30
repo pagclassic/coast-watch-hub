@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navigation } from 'lucide-react';
-import SimpleMapView from './SimpleMapView';
-
-// Dynamic import to avoid SSR issues - temporarily using SimpleMapView due to Leaflet issues
-// const MapView = React.lazy(() => import('./MapView'));
+import MapView from './MapView';
 
 interface MapWrapperProps {
   onReportClick?: () => void;
@@ -29,9 +26,8 @@ const MapWrapper: React.FC<MapWrapperProps> = ({ onReportClick, onMarkerClick, o
     );
   }
 
-  // Using SimpleMapView temporarily to avoid Leaflet errors
   return (
-    <SimpleMapView 
+    <MapView 
       onReportClick={onReportClick} 
       onMarkerClick={onMarkerClick} 
       onLocationChange={onLocationChange}

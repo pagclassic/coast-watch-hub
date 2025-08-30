@@ -19,12 +19,14 @@ import {
   X,
   List,
   Map,
-  Shield
+  Shield,
+  Database
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { addSampleData, clearSampleData } from '@/utils/sampleData';
 
 const Index = () => {
   const { user, signOut } = useAuth();
@@ -189,6 +191,62 @@ const Index = () => {
                 <List className="w-4 h-4" />
                 View All Reports
               </Button>
+
+              {/* Sample Data Management - Development Only */}
+              <div className="pt-2 border-t border-border">
+                <h4 className="text-xs font-medium text-muted-foreground mb-2">Development Tools</h4>
+                <div className="space-y-2">
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start gap-2 text-xs"
+                    onClick={async () => {
+                      try {
+                        if (user?.id) {
+                          await addSampleData(user.id);
+                          toast({
+                            title: "Success",
+                            description: "Sample hazard data added for testing",
+                          });
+                        }
+                      } catch (error) {
+                        toast({
+                          title: "Error",
+                          description: "Failed to add sample data",
+                          variant: "destructive"
+                        });
+                      }
+                    }}
+                  >
+                    <Database className="w-3 h-3" />
+                    Add Sample Data
+                  </Button>
+                  
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start gap-2 text-xs"
+                    onClick={async () => {
+                      try {
+                        await clearSampleData();
+                        toast({
+                          title: "Success",
+                          description: "Sample data cleared",
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Error",
+                          description: "Failed to clear sample data",
+                          variant: "destructive"
+                        });
+                      }
+                    }}
+                  >
+                    <Database className="w-3 h-3" />
+                    Clear Sample Data
+                  </Button>
+                </div>
+              </div>
 
               {/* Admin Dashboard Link - only show for admin users */}
               {(user?.email?.includes('admin') || user?.email?.includes('moderator')) && (

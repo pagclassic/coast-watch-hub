@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, AlertTriangle, Navigation, Plus } from 'lucide-react';
+import { MapPin, AlertTriangle, Navigation, Plus, Layers } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 // Import Leaflet CSS
@@ -16,20 +16,20 @@ if (typeof window !== 'undefined') {
   // Remove default icon URL getter
   delete (L.Icon.Default.prototype as any)._getIconUrl;
   
-  // Set default icon options
+  // Set default icon options with more reliable CDN sources
   L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
   });
 }
 
 // Create default icon
 const createDefaultIcon = () => {
   return L.icon({
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
@@ -135,6 +135,9 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
   const [reports, setReports] = useState<Report[]>([]);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showHazardZones, setShowHazardZones] = useState(true);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [mapLoading, setMapLoading] = useState(true);
 
   const fetchReports = async () => {
     try {
@@ -155,6 +158,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
       }
     } catch (error) {
       console.error('Error:', error);
+      setMapError('Failed to load hazard data');
     } finally {
       setLoading(false);
     }
@@ -174,16 +178,29 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
       )
       .subscribe();
 
+    // Set a timeout to ensure map loading doesn't get stuck
+    const mapTimeout = setTimeout(() => {
+      if (mapLoading) {
+        console.warn('Map loading timeout, forcing ready state');
+        setMapLoading(false);
+      }
+    }, 10000); // 10 second timeout
+
     return () => {
       subscription.unsubscribe();
+      clearTimeout(mapTimeout);
     };
-  }, []);
+  }, [mapLoading]);
 
   const handleLocationFound = (lat: number, lng: number) => {
     setUserLocation([lat, lng]);
     if (onLocationChange) {
       onLocationChange({ lat, lng });
     }
+  };
+
+  const handleMapLoad = () => {
+    setMapLoading(false);
   };
 
   const getSeverityBadge = (severity: number) => {
@@ -213,6 +230,11 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
     });
   };
 
+  // Group reports by severity for hazard zones
+  const criticalReports = reports.filter(r => r.severity >= 4);
+  const highRiskReports = reports.filter(r => r.severity === 3);
+  const mediumRiskReports = reports.filter(r => r.severity === 2);
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-muted/10">
@@ -224,19 +246,65 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
     );
   }
 
+  if (mapError) {
+    return (
+      <div className="h-full flex items-center justify-center bg-muted/10">
+        <div className="text-center space-y-4">
+          <AlertTriangle className="w-8 h-8 text-destructive mx-auto" />
+          <p className="text-destructive font-medium">Map Error</p>
+          <p className="text-muted-foreground">{mapError}</p>
+          <Button onClick={fetchReports} variant="outline">
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full bg-blue-50 overflow-hidden">
+      {/* Map Loading Overlay */}
+      {mapLoading && (
+        <div className="absolute inset-0 z-40 bg-white/80 flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <Navigation className="w-8 h-8 animate-spin text-primary mx-auto" />
+            <p className="text-muted-foreground">Loading map tiles...</p>
+          </div>
+        </div>
+      )}
+
       {/* Map Container */}
       <MapContainer
         center={[37.7749, -122.4194]} // Default to San Francisco Bay
         zoom={10}
-        style={{ height: '100%', width: '100%' }}
-        className="z-0"
+        style={{ height: '100%', width: '100%', minHeight: '400px', position: 'relative' }}
+        className="z-0 leaflet-container"
         key="main-map"
+        zoomControl={true}
+        attributionControl={true}
+        whenReady={handleMapLoad}
+        doubleClickZoom={true}
+        scrollWheelZoom={true}
+        dragging={true}
+        touchZoom={true}
+        maxBounds={[[-90, -180], [90, 180]]}
+        maxBoundsViscosity={1.0}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          maxZoom={19}
+          minZoom={2}
+          tileSize={256}
+          subdomains="abc"
+          eventHandlers={{
+            loading: () => setMapLoading(true),
+            load: () => setMapLoading(false),
+            tileerror: () => {
+              console.warn('Tile loading error, retrying...');
+              setMapLoading(false);
+            }
+          }}
         />
         
         <LocationFinder onLocationFound={handleLocationFound} />
@@ -252,6 +320,75 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
             </Popup>
           </Marker>
         )}
+
+        {/* Hazard Zones - Critical (Red) */}
+        {showHazardZones && criticalReports.map((report) => (
+          <Circle
+            key={`critical-${report.id}`}
+            center={[report.lat, report.lng]}
+            radius={2000} // 2km radius for critical hazards
+            pathOptions={{
+              color: '#dc2626',
+              fillColor: '#dc2626',
+              fillOpacity: 0.3,
+              weight: 2
+            }}
+          >
+            <Popup>
+              <div className="text-center">
+                <AlertTriangle className="w-4 h-4 mx-auto mb-1 text-red-600" />
+                <p className="font-medium text-red-600">Critical Hazard Zone</p>
+                <p className="text-sm text-muted-foreground">2km radius</p>
+              </div>
+            </Popup>
+          </Circle>
+        ))}
+
+        {/* Hazard Zones - High Risk (Orange) */}
+        {showHazardZones && highRiskReports.map((report) => (
+          <Circle
+            key={`high-${report.id}`}
+            center={[report.lat, report.lng]}
+            radius={1500} // 1.5km radius for high risk hazards
+            pathOptions={{
+              color: '#ea580c',
+              fillColor: '#ea580c',
+              fillOpacity: 0.25,
+              weight: 2
+            }}
+          >
+            <Popup>
+              <div className="text-center">
+                <AlertTriangle className="w-4 h-4 mx-auto mb-1 text-orange-500" />
+                <p className="font-medium text-orange-500">High Risk Zone</p>
+                <p className="text-sm text-muted-foreground">1.5km radius</p>
+              </div>
+            </Popup>
+          </Circle>
+        ))}
+
+        {/* Hazard Zones - Medium Risk (Blue) */}
+        {showHazardZones && mediumRiskReports.map((report) => (
+          <Circle
+            key={`medium-${report.id}`}
+            center={[report.lat, report.lng]}
+            radius={1000} // 1km radius for medium risk hazards
+            pathOptions={{
+              color: '#0ea5e9',
+              fillColor: '#0ea5e9',
+              fillOpacity: 0.2,
+              weight: 1
+            }}
+          >
+            <Popup>
+              <div className="text-center">
+                <AlertTriangle className="w-4 h-4 mx-auto mb-1 text-blue-500" />
+                <p className="font-medium text-blue-500">Medium Risk Zone</p>
+                <p className="text-sm text-muted-foreground">1km radius</p>
+              </div>
+            </Popup>
+          </Circle>
+        ))}
 
         {/* Hazard Report Markers */}
         {reports.map((report) => (
@@ -330,22 +467,37 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
         </Button>
       )}
 
-      {/* Map Legend */}
+      {/* Hazard Zones Toggle */}
+      <Button
+        onClick={() => setShowHazardZones(!showHazardZones)}
+        size="sm"
+        variant={showHazardZones ? "default" : "secondary"}
+        className="absolute top-4 right-4 z-10 shadow-lg"
+      >
+        <Layers className="w-4 h-4 mr-2" />
+        {showHazardZones ? "Hide" : "Show"} Zones
+      </Button>
+
+      {/* Enhanced Map Legend */}
       <Card className="absolute top-4 left-4 z-10 shadow-lg">
         <CardContent className="p-3">
-          <h4 className="font-medium text-sm mb-2">Hazard Severity</h4>
+          <h4 className="font-medium text-sm mb-2">Hazard Severity & Zones</h4>
           <div className="space-y-1 text-xs">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-red-600"></div>
-              <span>Critical (4-5)</span>
+              <span>Critical (4-5) - 2km radius</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-              <span>High (3)</span>
+              <span>High (3) - 1.5km radius</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-              <span>Medium-Low (1-2)</span>
+              <span>Medium (2) - 1km radius</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+              <span>Low (1) - No zone</span>
             </div>
           </div>
         </CardContent>

@@ -2,6 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Leaflet CSS for map functionality */
+@import 'leaflet/dist/leaflet.css';
+
+/* Custom Leaflet map styling */
+.leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+  z-index: 1;
+}
+
+.leaflet-map-pane {
+  z-index: 1;
+}
+
+.leaflet-tile-pane {
+  z-index: 2;
+}
+
+.leaflet-overlay-pane {
+  z-index: 3;
+}
+
+.leaflet-marker-pane {
+  z-index: 4;
+}
+
+.leaflet-tooltip-pane {
+  z-index: 5;
+}
+
+.leaflet-popup-pane {
+  z-index: 6;
+}
+
+/* Ensure map container is visible */
+.leaflet-container .leaflet-control-container {
+  z-index: 7;
+}
+
+/* Custom hazard zone styling */
+.hazard-zone-critical {
+  stroke: #dc2626 !important;
+  fill: #dc2626 !important;
+  fill-opacity: 0.3 !important;
+}
+
+.hazard-zone-high {
+  stroke: #ea580c !important;
+  fill: #ea580c !important;
+  fill-opacity: 0.25 !important;
+}
+
+.hazard-zone-medium {
+  stroke: #0ea5e9 !important;
+  fill: #0ea5e9 !important;
+  fill-opacity: 0.2 !important;
+}
+
 @layer base {
   :root {
     /* Maritime Color Palette */
