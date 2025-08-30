@@ -191,16 +191,7 @@ const Index = () => {
 
         {/* Main Map Area */}
         <div className="flex-1 relative">
-          <div className="h-full flex items-center justify-center bg-muted/10">
-            <div className="text-center space-y-4">
-              <Navigation className="w-8 h-8 text-primary mx-auto" />
-              <p className="text-muted-foreground">Map will load here</p>
-              <Button onClick={handleReportClick} className="ocean-glow ripple">
-                <Plus className="w-4 h-4 mr-2" />
-                Report Hazard
-              </Button>
-            </div>
-          </div>
+          <MapView onReportClick={handleReportClick} />
         </div>
       </div>
     </div>
