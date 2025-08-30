@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import MapWrapper from '@/components/MapWrapper';
+import HazardReportForm from '@/components/HazardReportForm';
+import ReportDetail from '@/components/ReportDetail';
+import HazardFeed from '@/components/HazardFeed';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   LogOut, 
   Plus, 
@@ -12,23 +16,43 @@ import {
   Users, 
   Navigation,
   Menu,
-  X
+  X,
+  List,
+  Map,
+  Shield
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 
 const Index = () => {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { pendingReportsCount } = useOfflineSync();
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [activeTab, setActiveTab] = useState('map');
 
   const handleSignOut = async () => {
     await signOut();
   };
 
   const handleReportClick = () => {
-    toast({
-      title: "Coming Soon",
-      description: "Hazard reporting form will be available soon!"
-    });
+    setShowReportForm(true);
+  };
+
+  const handleReportDetailClick = (reportId: string) => {
+    setSelectedReportId(reportId);
+  };
+
+  const handleCloseReportForm = () => {
+    setShowReportForm(false);
+  };
+
+  const handleCloseReportDetail = () => {
+    setSelectedReportId(null);
   };
 
   const toggleSidebar = () => {
@@ -134,16 +158,33 @@ const Index = () => {
               >
                 <Plus className="w-4 h-4" />
                 Report New Hazard
+                {pendingReportsCount > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {pendingReportsCount} pending
+                  </Badge>
+                )}
               </Button>
 
               <Button 
                 variant="outline"
                 className="w-full justify-start gap-3"
-                onClick={() => toast({ title: "Coming Soon", description: "View reports feature coming soon!" })}
+                onClick={() => setActiveTab('feed')}
               >
-                <AlertTriangle className="w-4 h-4" />
+                <List className="w-4 h-4" />
                 View All Reports
               </Button>
+
+              {/* Admin Dashboard Link - only show for admin users */}
+              {(user?.email?.includes('admin') || user?.email?.includes('moderator')) && (
+                <Button 
+                  variant="outline"
+                  className="w-full justify-start gap-3"
+                  onClick={() => navigate('/admin')}
+                >
+                  <Shield className="w-4 h-4" />
+                  Admin Dashboard
+                </Button>
+              )}
             </div>
 
             {/* Recent Activity */}
@@ -189,11 +230,52 @@ const Index = () => {
           />
         )}
 
-        {/* Main Map Area */}
+        {/* Main Content Area */}
         <div className="flex-1 relative">
-          <MapWrapper onReportClick={handleReportClick} />
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+            <div className="border-b bg-card px-4 py-2">
+              <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsTrigger value="map" className="flex items-center gap-2">
+                  <Map className="w-4 h-4" />
+                  Map View
+                </TabsTrigger>
+                <TabsTrigger value="feed" className="flex items-center gap-2">
+                  <List className="w-4 h-4" />
+                  Feed
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            
+            <TabsContent value="map" className="flex-1 m-0">
+              <MapWrapper 
+                onReportClick={handleReportClick}
+                onMarkerClick={handleReportDetailClick}
+                onLocationChange={setUserLocation}
+              />
+            </TabsContent>
+            
+            <TabsContent value="feed" className="flex-1 m-0">
+              <HazardFeed 
+                userLocation={userLocation}
+                onReportClick={handleReportDetailClick}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
+
+      {/* Modals */}
+      <HazardReportForm
+        isOpen={showReportForm}
+        onClose={handleCloseReportForm}
+        initialLocation={userLocation}
+      />
+
+      <ReportDetail
+        isOpen={!!selectedReportId}
+        onClose={handleCloseReportDetail}
+        reportId={selectedReportId}
+      />
     </div>
   );
 };

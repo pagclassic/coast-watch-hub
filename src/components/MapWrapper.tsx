@@ -6,9 +6,11 @@ const MapView = React.lazy(() => import('./MapView'));
 
 interface MapWrapperProps {
   onReportClick?: () => void;
+  onMarkerClick?: (reportId: string) => void;
+  onLocationChange?: (location: { lat: number; lng: number }) => void;
 }
 
-const MapWrapper: React.FC<MapWrapperProps> = ({ onReportClick }) => {
+const MapWrapper: React.FC<MapWrapperProps> = ({ onReportClick, onMarkerClick, onLocationChange }) => {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ const MapWrapper: React.FC<MapWrapperProps> = ({ onReportClick }) => {
         </div>
       }
     >
-      <MapView onReportClick={onReportClick} />
+      <MapView onReportClick={onReportClick} onMarkerClick={onMarkerClick} onLocationChange={onLocationChange} />
     </React.Suspense>
   );
 };

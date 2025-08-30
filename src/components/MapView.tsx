@@ -70,6 +70,8 @@ interface Report {
 
 interface MapViewProps {
   onReportClick?: () => void;
+  onMarkerClick?: (reportId: string) => void;
+  onLocationChange?: (location: { lat: number; lng: number }) => void;
 }
 
 // Location finder component
@@ -107,7 +109,7 @@ const LocationFinder: React.FC<{ onLocationFound: (lat: number, lng: number) => 
   return null;
 };
 
-const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
+const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocationChange }) => {
   const [reports, setReports] = useState<Report[]>([]);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -157,6 +159,9 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
 
   const handleLocationFound = (lat: number, lng: number) => {
     setUserLocation([lat, lng]);
+    if (onLocationChange) {
+      onLocationChange({ lat, lng });
+    }
   };
 
   const getSeverityBadge = (severity: number) => {
@@ -231,6 +236,13 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
             key={report.id}
             position={[report.lat, report.lng]}
             icon={createHazardIcon(report.severity, report.type)}
+            eventHandlers={{
+              click: () => {
+                if (onMarkerClick) {
+                  onMarkerClick(report.id);
+                }
+              }
+            }}
           >
             <Popup maxWidth={300}>
               <Card className="border-0 shadow-none">
@@ -247,7 +259,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
                   </div>
                   
                   {report.notes && (
-                    <p className="text-sm text-foreground">{report.notes}</p>
+                    <p className="text-sm text-foreground line-clamp-2">{report.notes}</p>
                   )}
                   
                   {report.photo_url && (
@@ -263,8 +275,18 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick }) => {
                       <AlertTriangle className="w-3 h-3" />
                       <span>Severity: {report.severity}/5</span>
                     </div>
-                    <Button size="sm" variant="outline" className="h-7 text-xs">
-                      Confirm
+                    <Button 
+                      size="sm" 
+                      variant="default" 
+                      className="h-7 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onMarkerClick) {
+                          onMarkerClick(report.id);
+                        }
+                      }}
+                    >
+                      View Details
                     </Button>
                   </div>
                 </CardContent>
