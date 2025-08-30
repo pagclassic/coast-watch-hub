@@ -38,6 +38,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState('map');
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string>('user');
 
   const handleSignOut = async () => {
     await signOut();
@@ -87,6 +88,29 @@ const Index = () => {
     }
   };
 
+  // Fetch user role
+  const fetchUserRole = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user role:', error);
+        setUserRole('user'); // Default to user role
+      } else {
+        setUserRole(data?.role || 'user');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setUserRole('user'); // Default to user role
+    }
+  };
+
   // Calculate stats
   const getStats = () => {
     if (loading) return { activeHazards: 0, communityReports: 0 };
@@ -108,6 +132,7 @@ const Index = () => {
   // Fetch reports on component mount
   useEffect(() => {
     fetchReports();
+    fetchUserRole(); // Fetch user role on mount
 
     // Subscribe to real-time updates
     const subscription = supabase
@@ -249,7 +274,7 @@ const Index = () => {
               </Button>
 
               {/* Admin Dashboard Link - only show for admin users */}
-              {(user?.email?.includes('admin') || user?.email?.includes('moderator')) && (
+              {userRole === 'admin' && (
                 <Button 
                   variant="outline"
                   className="w-full justify-start gap-3"
