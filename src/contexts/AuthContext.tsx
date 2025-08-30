@@ -12,19 +12,18 @@ interface AuthContextType {
   loading: boolean;
 }
 
-const defaultAuthContext: AuthContextType = {
+const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   signUp: async () => ({ error: null }),
   signIn: async () => ({ error: null }),
   signOut: async () => {},
   loading: true
-};
-
-const AuthContext = createContext<AuthContextType>(defaultAuthContext);
+});
 
 export const useAuth = () => {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  return context;
 };
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
