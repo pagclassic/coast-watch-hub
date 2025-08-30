@@ -79,31 +79,53 @@ const LocationFinder: React.FC<{ onLocationFound: (lat: number, lng: number) => 
   const map = useMap();
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          map.setView([latitude, longitude], 13);
-          onLocationFound(latitude, longitude);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          toast({
-            title: "Location Error",
-            description: "Could not get your current location. Using default location.",
-            variant: "destructive"
-          });
-          // Default to San Francisco Bay
+    if (!map) return;
+
+    const handleLocation = () => {
+      if (typeof window !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            try {
+              map.setView([latitude, longitude], 13);
+              onLocationFound(latitude, longitude);
+            } catch (error) {
+              console.error('Error setting map view:', error);
+              onLocationFound(latitude, longitude);
+            }
+          },
+          (error) => {
+            console.error('Error getting location:', error);
+            toast({
+              title: "Location Error",
+              description: "Could not get your current location. Using default location.",
+              variant: "destructive"
+            });
+            // Default to San Francisco Bay
+            try {
+              map.setView([37.7749, -122.4194], 10);
+            } catch (mapError) {
+              console.error('Error setting default map view:', mapError);
+            }
+            onLocationFound(37.7749, -122.4194);
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
+        );
+      } else {
+        // Default to San Francisco Bay
+        try {
           map.setView([37.7749, -122.4194], 10);
-          onLocationFound(37.7749, -122.4194);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
-      );
-    } else {
-      // Default to San Francisco Bay
-      map.setView([37.7749, -122.4194], 10);
-      onLocationFound(37.7749, -122.4194);
-    }
+        } catch (mapError) {
+          console.error('Error setting default map view:', mapError);
+        }
+        onLocationFound(37.7749, -122.4194);
+      }
+    };
+
+    // Add a small delay to ensure map is fully initialized
+    const timer = setTimeout(handleLocation, 100);
+
+    return () => clearTimeout(timer);
   }, [map, onLocationFound]);
 
   return null;
@@ -210,6 +232,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
         zoom={10}
         style={{ height: '100%', width: '100%' }}
         className="z-0"
+        key="main-map"
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

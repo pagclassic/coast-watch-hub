@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -98,13 +99,7 @@ const severityLabels = {
 const LocationPicker: React.FC<{ 
   position: [number, number]; 
   onPositionChange: (lat: number, lng: number) => void 
-}> = ({ position, onPositionChange }) => {
-  useMapEvents({
-    click: (e) => {
-      onPositionChange(e.latlng.lat, e.latlng.lng);
-    },
-  });
-
+}> = ({ position }) => {
   return (
     <Marker position={position}>
       <Popup>
@@ -331,6 +326,9 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
             <AlertTriangle className="w-5 h-5 text-primary" />
             Report Marine Hazard
           </DialogTitle>
+          <DialogDescription>
+            Help keep our waters safe by reporting marine hazards you encounter.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -441,12 +439,60 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
               )}
             </div>
 
-            {/* Location Picker */}
-            <div className="space-y-2">
+            {/* Location */}
+            <div className="space-y-3">
               <FormLabel>Location</FormLabel>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="lat"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Latitude</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.0001"
+                          placeholder="37.7749"
+                          {...field}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value);
+                            field.onChange(value);
+                            setMapPosition([value, mapPosition[1]]);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="lng"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Longitude</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.0001"
+                          placeholder="-122.4194"
+                          {...field}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value);
+                            field.onChange(value);
+                            setMapPosition([mapPosition[0], value]);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <Card>
                 <CardContent className="p-3">
-                  <div className="h-48 w-full rounded-md overflow-hidden">
+                  <div className="h-32 w-full rounded-md overflow-hidden">
                     <MapContainer
                       center={mapPosition}
                       zoom={13}
@@ -464,10 +510,7 @@ const HazardReportForm: React.FC<HazardReportFormProps> = ({
                   </div>
                   <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                     <MapPin className="w-3 h-3" />
-                    <span>
-                      {mapPosition[0].toFixed(4)}, {mapPosition[1].toFixed(4)}
-                    </span>
-                    <span className="text-xs">• Click map to adjust location</span>
+                    <span>Location preview</span>
                   </div>
                 </CardContent>
               </Card>

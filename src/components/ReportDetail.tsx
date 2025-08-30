@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -239,6 +240,9 @@ const ReportDetail: React.FC<ReportDetailProps> = ({
             <AlertTriangle className="w-5 h-5 text-primary" />
             Hazard Report Details
           </DialogTitle>
+          <DialogDescription>
+            Review this hazard report and help verify its accuracy.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
