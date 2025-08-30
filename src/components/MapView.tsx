@@ -105,7 +105,10 @@ interface MapViewProps {
 }
 
 // Location finder component
-const LocationFinder: React.FC<{ onLocationFound: (lat: number, lng: number) => void }> = ({ onLocationFound }) => {
+const LocationFinder: React.FC<{ 
+  onLocationFound: (lat: number, lng: number) => void;
+  mapRef: L.Map | null;
+}> = ({ onLocationFound, mapRef }) => {
   const map = useMap();
 
   useEffect(() => {
@@ -117,7 +120,11 @@ const LocationFinder: React.FC<{ onLocationFound: (lat: number, lng: number) => 
           (position) => {
             const { latitude, longitude } = position.coords;
             try {
-              map.setView([latitude, longitude], 13);
+              if (mapRef) {
+                mapRef.setView([latitude, longitude], 13);
+              } else {
+                map.setView([latitude, longitude], 13);
+              }
               onLocationFound(latitude, longitude);
             } catch (error) {
               console.error('Error setting map view:', error);
@@ -133,7 +140,11 @@ const LocationFinder: React.FC<{ onLocationFound: (lat: number, lng: number) => 
             });
             // Default to San Francisco Bay
             try {
-              map.setView([37.7749, -122.4194], 10);
+              if (mapRef) {
+                mapRef.setView([37.7749, -122.4194], 10);
+              } else {
+                map.setView([37.7749, -122.4194], 10);
+              }
             } catch (mapError) {
               console.error('Error setting default map view:', mapError);
             }
@@ -144,7 +155,11 @@ const LocationFinder: React.FC<{ onLocationFound: (lat: number, lng: number) => 
       } else {
         // Default to San Francisco Bay
         try {
-          map.setView([37.7749, -122.4194], 10);
+          if (mapRef) {
+            mapRef.setView([37.7749, -122.4194], 10);
+          } else {
+            map.setView([37.7749, -122.4194], 10);
+          }
         } catch (mapError) {
           console.error('Error setting default map view:', mapError);
         }
@@ -156,7 +171,7 @@ const LocationFinder: React.FC<{ onLocationFound: (lat: number, lng: number) => 
     const timer = setTimeout(handleLocation, 100);
 
     return () => clearTimeout(timer);
-  }, [map, onLocationFound]);
+  }, [map, onLocationFound, mapRef]);
 
   return null;
 };
@@ -165,7 +180,8 @@ const LocationFinder: React.FC<{ onLocationFound: (lat: number, lng: number) => 
 const MapEventHandler: React.FC<{ 
   onCenterChange: (center: [number, number]) => void;
   onZoomChange: (zoom: number) => void;
-}> = ({ onCenterChange, onZoomChange }) => {
+  mapRef: L.Map | null;
+}> = ({ onCenterChange, onZoomChange, mapRef }) => {
   const map = useMap();
 
   useEffect(() => {
@@ -203,6 +219,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
   const [isSearching, setIsSearching] = useState(false);
   const [mapCenter, setMapCenter] = useState<[number, number]>([37.7749, -122.4194]);
   const [mapZoom, setMapZoom] = useState(10);
+  const [mapRef, setMapRef] = useState<L.Map | null>(null);
 
   // Filter reports based on critical filter
   const filteredReports = showOnlyCritical 
@@ -295,8 +312,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
 
   // Handle search result selection
   const handleSearchResultClick = (result: { lat: number; lng: number; name: string }) => {
-    setMapCenter([result.lat, result.lng]);
-    setMapZoom(13);
+    moveMapTo(result.lat, result.lng, 13);
     setSearchResults([]);
     setSearchQuery('');
     
@@ -314,9 +330,8 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
 
   // Return to user location
   const returnToUserLocation = () => {
-    if (userLocation) {
-      setMapCenter(userLocation);
-      setMapZoom(13);
+    if (userLocation && mapRef) {
+      mapRef.setView(userLocation, 13);
       toast({
         title: "Location Updated",
         description: "Returned to your current location",
@@ -327,6 +342,13 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
         description: "Your location is not available. Please enable location services.",
         variant: "destructive"
       });
+    }
+  };
+
+  // Programmatically move map to a new location
+  const moveMapTo = (lat: number, lng: number, zoom: number = 13) => {
+    if (mapRef) {
+      mapRef.setView([lat, lng], zoom, { animate: true });
     }
   };
 
@@ -484,16 +506,24 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
         zoomControl={false}
         minZoom={3}
         maxZoom={18}
+        ref={setMapRef}
+        doubleClickZoom={true}
+        scrollWheelZoom={true}
+        dragging={true}
+        touchZoom={true}
+        boxZoom={true}
+        keyboard={true}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         
-        <LocationFinder onLocationFound={handleLocationFound} />
+        <LocationFinder onLocationFound={handleLocationFound} mapRef={mapRef} />
         <MapEventHandler 
           onCenterChange={setMapCenter}
           onZoomChange={setMapZoom}
+          mapRef={mapRef}
         />
         
         {/* Zoom Controls */}
@@ -740,8 +770,7 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
               size="sm"
               variant="outline"
               onClick={() => {
-                setMapCenter([37.7749, -122.4194]);
-                setMapZoom(10);
+                moveMapTo(37.7749, -122.4194, 10);
                 toast({
                   title: "Map Reset",
                   description: "Returned to San Francisco Bay area",
