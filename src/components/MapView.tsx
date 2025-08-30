@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, AlertTriangle, Navigation, Plus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { MapPin, AlertTriangle, Navigation, Plus, Search, Crosshair, Globe } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 // Import Leaflet CSS
@@ -160,12 +161,48 @@ const LocationFinder: React.FC<{ onLocationFound: (lat: number, lng: number) => 
   return null;
 };
 
+// Map event handler component
+const MapEventHandler: React.FC<{ 
+  onCenterChange: (center: [number, number]) => void;
+  onZoomChange: (zoom: number) => void;
+}> = ({ onCenterChange, onZoomChange }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    const handleMoveEnd = () => {
+      const center = map.getCenter();
+      onCenterChange([center.lat, center.lng]);
+    };
+
+    const handleZoomEnd = () => {
+      onZoomChange(map.getZoom());
+    };
+
+    map.on('moveend', handleMoveEnd);
+    map.on('zoomend', handleZoomEnd);
+
+    return () => {
+      map.off('moveend', handleMoveEnd);
+      map.off('zoomend', handleZoomEnd);
+    };
+  }, [map, onCenterChange, onZoomChange]);
+
+  return null;
+};
+
 const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocationChange }) => {
   const [reports, setReports] = useState<Report[]>([]);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
   const [showHazardAreas, setShowHazardAreas] = useState(true);
   const [showOnlyCritical, setShowOnlyCritical] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Array<{ lat: number; lng: number; name: string }>>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([37.7749, -122.4194]);
+  const [mapZoom, setMapZoom] = useState(10);
 
   // Filter reports based on critical filter
   const filteredReports = showOnlyCritical 
@@ -224,6 +261,73 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
     });
     
     return totalArea;
+  };
+
+  // Search for locations using OpenStreetMap Nominatim
+  const searchLocation = async (query: string) => {
+    if (!query.trim()) return;
+    
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`
+      );
+      const data = await response.json();
+      
+      const results = data.map((item: any) => ({
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon),
+        name: item.display_name
+      }));
+      
+      setSearchResults(results);
+    } catch (error) {
+      console.error('Error searching location:', error);
+      toast({
+        title: "Search Error",
+        description: "Failed to search for location. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle search result selection
+  const handleSearchResultClick = (result: { lat: number; lng: number; name: string }) => {
+    setMapCenter([result.lat, result.lng]);
+    setMapZoom(13);
+    setSearchResults([]);
+    setSearchQuery('');
+    
+    toast({
+      title: "Location Found",
+      description: `Navigating to ${result.name}`,
+    });
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  // Return to user location
+  const returnToUserLocation = () => {
+    if (userLocation) {
+      setMapCenter(userLocation);
+      setMapZoom(13);
+      toast({
+        title: "Location Updated",
+        description: "Returned to your current location",
+      });
+    } else {
+      toast({
+        title: "Location Unavailable",
+        description: "Your location is not available. Please enable location services.",
+        variant: "destructive"
+      });
+    }
   };
 
   const fetchReports = async () => {
@@ -316,13 +420,70 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
 
   return (
     <div className="relative h-full w-full">
+      {/* Search Interface */}
+      <Card className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 shadow-lg w-80">
+        <CardContent className="p-3">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search for a location..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && searchLocation(searchQuery)}
+                className="pl-8 pr-8"
+              />
+              {searchQuery && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={clearSearch}
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                >
+                  <Crosshair className="w-3 h-3" />
+                </Button>
+              )}
+            </div>
+            <Button
+              size="sm"
+              onClick={() => searchLocation(searchQuery)}
+              disabled={isSearching || !searchQuery.trim()}
+              className="px-3"
+            >
+              {isSearching ? '...' : 'Search'}
+            </Button>
+          </div>
+          
+          {/* Search Results */}
+          {searchResults.length > 0 && (
+            <div className="mt-2 max-h-40 overflow-y-auto">
+              {searchResults.map((result, index) => (
+                <div
+                  key={index}
+                  className="p-2 hover:bg-muted rounded cursor-pointer text-sm"
+                  onClick={() => handleSearchResultClick(result)}
+                >
+                  <div className="font-medium truncate">{result.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {result.lat.toFixed(4)}, {result.lng.toFixed(4)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Map Container */}
       <MapContainer
-        center={[37.7749, -122.4194]} // Default to San Francisco Bay
-        zoom={10}
+        center={mapCenter}
+        zoom={mapZoom}
         style={{ height: '100%', width: '100%' }}
         className="z-0"
         key="main-map"
+        zoomControl={false}
+        minZoom={3}
+        maxZoom={18}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -330,6 +491,13 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
         />
         
         <LocationFinder onLocationFound={handleLocationFound} />
+        <MapEventHandler 
+          onCenterChange={setMapCenter}
+          onZoomChange={setMapZoom}
+        />
+        
+        {/* Zoom Controls */}
+        <ZoomControl position="bottomright" />
         
         {/* User Location Marker */}
         {userLocation && (
@@ -522,36 +690,79 @@ const MapView: React.FC<MapViewProps> = ({ onReportClick, onMarkerClick, onLocat
               </Button>
             </div>
           </div>
-                      <div className="space-y-2 text-xs">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-600"></div>
-                  <span>Critical (4-5)</span>
-                </div>
-                <div className="ml-5 text-xs text-muted-foreground">2km radius area</div>
+          <div className="space-y-2 text-xs">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-600"></div>
+                <span>Critical (4-5)</span>
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                  <span>High (3)</span>
-                </div>
-                <div className="ml-5 text-xs text-muted-foreground">1.5km radius area</div>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                  <span>Medium-Low (1-2)</span>
-                </div>
-                <div className="ml-5 text-xs text-muted-foreground">1km radius area</div>
-              </div>
-              <div className="pt-2 border-t border-border/50">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <span>Overlapping Areas</span>
-                </div>
-                <div className="ml-5 text-xs text-muted-foreground">Multiple hazards nearby</div>
-              </div>
+              <div className="ml-5 text-xs text-muted-foreground">2km radius area</div>
             </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                <span>High (3)</span>
+              </div>
+              <div className="ml-5 text-xs text-muted-foreground">1.5km radius area</div>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                <span>Medium-Low (1-2)</span>
+              </div>
+              <div className="ml-5 text-xs text-muted-foreground">1km radius area</div>
+            </div>
+            <div className="pt-2 border-t border-border/50">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <span>Overlapping Areas</span>
+              </div>
+              <div className="ml-5 text-xs text-muted-foreground">Multiple hazards nearby</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Navigation Controls */}
+      <Card className="absolute bottom-20 left-4 z-10 shadow-lg">
+        <CardContent className="p-2">
+          <div className="flex flex-col gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={returnToUserLocation}
+              className="h-8 w-8 p-0"
+              title="Return to your location"
+            >
+              <Crosshair className="w-4 h-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setMapCenter([37.7749, -122.4194]);
+                setMapZoom(10);
+                toast({
+                  title: "Map Reset",
+                  description: "Returned to San Francisco Bay area",
+                });
+              }}
+              className="h-8 w-8 p-0"
+              title="Reset to default area"
+            >
+              <Globe className="w-4 h-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Current Location Info */}
+      <Card className="absolute bottom-4 left-4 z-10 shadow-lg">
+        <CardContent className="p-2">
+          <div className="text-xs text-muted-foreground">
+            <div>Center: {mapCenter[0].toFixed(4)}, {mapCenter[1].toFixed(4)}</div>
+            <div>Zoom: {mapZoom}</div>
+          </div>
         </CardContent>
       </Card>
     </div>
