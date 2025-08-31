@@ -379,6 +379,164 @@ body {
   }
 }
 
+/* Mobile Menu Animations */
+.mobile-menu-overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.mobile-menu-panel {
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Mobile Menu Touch Interactions */
+.mobile-menu-backdrop {
+  touch-action: none;
+}
+
+.mobile-menu-panel {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+
+/* Mobile Menu Focus Management */
+.mobile-menu-panel:focus-within {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: -2px;
+}
+
+/* Mobile Menu Button States */
+.mobile-menu-button {
+  transition: all 0.2s ease;
+}
+
+.mobile-menu-button:active {
+  transform: scale(0.95);
+}
+
+.mobile-menu-button:focus {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+
+/* Mobile Menu Item Hover Effects */
+@media (hover: hover) {
+  .mobile-menu-item:hover {
+    background-color: hsl(var(--muted));
+    transform: translateX(-4px);
+  }
+}
+
+/* Mobile Menu Item Active States */
+.mobile-menu-item:active {
+  background-color: hsl(var(--accent));
+  transform: scale(0.98);
+}
+
+/* Mobile Menu Accessibility */
+.mobile-menu-panel[aria-hidden="true"] {
+  pointer-events: none;
+}
+
+.mobile-menu-panel[aria-hidden="false"] {
+  pointer-events: auto;
+}
+
+/* Mobile Menu Scroll Behavior */
+.mobile-menu-content {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground)) transparent;
+}
+
+.mobile-menu-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.mobile-menu-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mobile-menu-content::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground));
+  border-radius: 2px;
+}
+
+/* Mobile Menu Responsive Adjustments */
+@media (max-width: 480px) {
+  .mobile-menu-panel {
+    width: 100%;
+    right: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .mobile-menu-panel {
+    width: 280px;
+  }
+}
+
+/* Mobile Menu Loading States */
+.mobile-menu-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.mobile-menu-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid hsl(var(--muted));
+  border-top: 2px solid hsl(var(--primary));
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Mobile Menu Transitions */
+.mobile-menu-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-menu-transition-fast {
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mobile Menu Shadows */
+.mobile-menu-shadow {
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Mobile Menu Border Radius */
+.mobile-menu-rounded {
+  border-radius: 16px 0 0 16px;
+}
+
+@media (max-width: 480px) {
+  .mobile-menu-rounded {
+    border-radius: 0;
+  }
+}
+
 /* Mobile-optimized tables */
 @media (max-width: 768px) {
   .mobile-table {

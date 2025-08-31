@@ -100,6 +100,42 @@ export default function Index() {
     console.log('Report clicked:', report);
   };
 
+  // Handle mobile menu toggle
+  const toggleMobileMenu = () => {
+    setShowMobileMenu(!showMobileMenu);
+  };
+
+  // Handle mobile menu close
+  const closeMobileMenu = () => {
+    setShowMobileMenu(false);
+  };
+
+  // Handle menu item click
+  const handleMenuItemClick = (action: () => void) => {
+    action();
+    closeMobileMenu();
+  };
+
+  // Handle escape key to close menu
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showMobileMenu) {
+        closeMobileMenu();
+      }
+    };
+
+    if (showMobileMenu) {
+      document.addEventListener('keydown', handleEscapeKey);
+      // Prevent body scroll when menu is open
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+      document.body.style.overflow = 'unset';
+    };
+  }, [showMobileMenu]);
+
   useEffect(() => {
     if (user) {
       fetchUserRole();
@@ -116,7 +152,7 @@ export default function Index() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            onClick={toggleMobileMenu}
             className="text-primary-foreground hover:bg-primary-foreground/20"
           >
             {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -126,27 +162,47 @@ export default function Index() {
 
       {/* Mobile Menu Overlay */}
       {showMobileMenu && (
-        <div className="lg:hidden fixed inset-0 bg-black/50 z-50">
-          <div className="absolute right-0 top-0 h-full w-64 bg-background shadow-lg p-4">
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/50 z-50 mobile-menu-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Navigation menu"
+        >
+          {/* Backdrop - click to close */}
+          <div 
+            className="absolute inset-0 mobile-menu-backdrop"
+            onClick={closeMobileMenu}
+            aria-hidden="true"
+          />
+          
+          {/* Menu Panel */}
+          <div 
+            className="absolute right-0 top-0 h-full w-64 bg-background shadow-lg p-4 z-10 mobile-menu-panel mobile-menu-shadow mobile-menu-rounded mobile-menu-transition"
+            role="navigation"
+            aria-label="Main navigation"
+            style={{
+              transform: showMobileMenu ? 'translateX(0)' : 'translateX(100%)'
+            }}
+          >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Menu</h2>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowMobileMenu(false)}
+                onClick={closeMobileMenu}
+                className="hover:bg-muted mobile-menu-button"
+                aria-label="Close menu"
               >
                 <X className="w-4 h-4" />
               </Button>
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-3 mobile-menu-content">
               <Button
                 variant="outline"
-                className="w-full justify-start gap-3"
-                onClick={() => {
-                  setActiveTab('map');
-                  setShowMobileMenu(false);
-                }}
+                className="w-full justify-start gap-3 mobile-menu-item mobile-menu-transition-fast"
+                onClick={() => handleMenuItemClick(() => setActiveTab('map'))}
+                aria-label="Switch to map view"
               >
                 <Map className="w-4 h-4" />
                 Map View
@@ -154,11 +210,9 @@ export default function Index() {
               
               <Button
                 variant="outline"
-                className="w-full justify-start gap-3"
-                onClick={() => {
-                  setActiveTab('feed');
-                  setShowMobileMenu(false);
-                }}
+                className="w-full justify-start gap-3 mobile-menu-item mobile-menu-transition-fast"
+                onClick={() => handleMenuItemClick(() => setActiveTab('feed'))}
+                aria-label="Switch to list view"
               >
                 <List className="w-4 h-4" />
                 List View
@@ -167,11 +221,9 @@ export default function Index() {
               {userRole === 'admin' && (
                 <Button 
                   variant="outline"
-                  className="w-full justify-start gap-3"
-                  onClick={() => {
-                    navigate('/admin');
-                    setShowMobileMenu(false);
-                  }}
+                  className="w-full justify-start gap-3 mobile-menu-item mobile-menu-transition-fast"
+                  onClick={() => handleMenuItemClick(() => navigate('/admin'))}
+                  aria-label="Access admin dashboard"
                 >
                   <Shield className="w-4 h-4" />
                   Admin Dashboard
