@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -47,24 +47,59 @@ const ReportDetail: React.FC<ReportDetailProps> = ({
   onClose,
   reportId
 }) => {
-  const { user } = useAuth();
   const [report, setReport] = useState<Report | null>(null);
-  const [confirmations, setConfirmations] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
   const [userConfirmed, setUserConfirmed] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [userFlagged, setUserFlagged] = useState(false);
+  const [confirmations, setConfirmations] = useState(0);
+  const [flags, setFlags] = useState(0);
+  const { user } = useAuth();
 
-  useEffect(() => {
-    if (reportId && isOpen) {
-      fetchReportDetails();
-      fetchConfirmations();
-    }
-  }, [reportId, isOpen]);
+  // Check if user has already confirmed or flagged this report
+  const checkUserActions = useCallback(async () => {
+    if (!user || !reportId) return;
 
-  const fetchReportDetails = async () => {
-    if (!reportId) return;
-    
-    setLoading(true);
     try {
+      const { data: confirmationsData } = await supabase
+        .from('report_confirmations')
+        .select('*')
+        .eq('report_id', reportId)
+        .eq('user_id', user.id);
+
+      if (confirmationsData) {
+        const userConfirm = confirmationsData.find(c => c.confirmation_type === 'confirm');
+        const userFlag = confirmationsData.find(c => c.confirmation_type === 'flag');
+        
+        setUserConfirmed(!!userConfirm);
+        setUserFlagged(!!userFlag);
+      }
+
+      // Get total counts
+      const { count: confirmCount } = await supabase
+        .from('report_confirmations')
+        .select('*', { count: 'exact', head: true })
+        .eq('report_id', reportId)
+        .eq('confirmation_type', 'confirm');
+
+      const { count: flagCount } = await supabase
+        .from('report_confirmations')
+        .select('*', { count: 'exact', head: true })
+        .eq('report_id', reportId)
+        .eq('confirmation_type', 'flag');
+
+      setConfirmations(confirmCount || 0);
+      setFlags(flagCount || 0);
+    } catch (error) {
+      console.error('Error checking user actions:', error);
+    }
+  }, [user, reportId]);
+
+  // Fetch report details
+  const fetchReport = useCallback(async () => {
+    if (!reportId) return;
+
+    try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('reports')
         .select('*')
@@ -76,81 +111,46 @@ const ReportDetail: React.FC<ReportDetailProps> = ({
       }
 
       setReport(data);
+      
+      // Check user actions after fetching report
+      await checkUserActions();
     } catch (error) {
       console.error('Error fetching report:', error);
       toast({
         title: "Error",
-        description: "Failed to load report details",
+        description: "Failed to load report details.",
         variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [reportId, checkUserActions]);
 
-  const fetchConfirmations = async () => {
-    if (!reportId || !user) return;
-
-    try {
-      // Get total confirmations count
-      const { count } = await supabase
-        .from('report_confirmations')
-        .select('*', { count: 'exact', head: true })
-        .eq('report_id', reportId);
-
-      setConfirmations(count || 0);
-
-      // Check if current user has confirmed
-      const { data } = await supabase
-        .from('report_confirmations')
-        .select('id')
-        .eq('report_id', reportId)
-        .eq('user_id', user.id)
-        .single();
-
-      setUserConfirmed(!!data);
-    } catch (error) {
-      // User hasn't confirmed yet, which is fine
-      setUserConfirmed(false);
+  useEffect(() => {
+    if (reportId && isOpen) {
+      fetchReport();
     }
-  };
-
-  const handleConfirm = async () => {
-    if (!user || !reportId || userConfirmed) return;
-
-    try {
-      const { error } = await supabase
-        .from('report_confirmations')
-        .insert({
-          report_id: reportId,
-          user_id: user.id
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      setUserConfirmed(true);
-      setConfirmations(prev => prev + 1);
-      
-      toast({
-        title: "Confirmed",
-        description: "Thank you for confirming this hazard report!",
-      });
-    } catch (error) {
-      console.error('Error confirming report:', error);
-      toast({
-        title: "Error",
-        description: "Failed to confirm report. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
+  }, [reportId, isOpen, fetchReport]);
 
   const handleFlag = async () => {
     if (!reportId) return;
 
     try {
+      // First, add a confirmation record
+      const { error: confirmationError } = await supabase
+        .from('report_confirmations')
+        .insert({
+          report_id: reportId,
+          user_id: user?.id,
+          confirmation_type: 'flag'
+        });
+
+      if (confirmationError) {
+        console.error('Error adding confirmation:', confirmationError);
+        // Continue anyway, the main update is more important
+      }
+
+      // Update the report status
       const { error } = await supabase
         .from('reports')
         .update({ status: 'flagged' })
@@ -170,9 +170,65 @@ const ReportDetail: React.FC<ReportDetailProps> = ({
       }
     } catch (error) {
       console.error('Error flagging report:', error);
+      
+      // More specific error messages
+      let errorMessage = "Failed to flag report. Please try again.";
+      
+      if (error?.code === '23505') {
+        errorMessage = "You have already flagged this report.";
+      } else if (error?.code === '42501') {
+        errorMessage = "You don't have permission to flag this report.";
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to flag report. Please try again.",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!reportId) return;
+
+    try {
+      // Add confirmation record
+      const { error: confirmationError } = await supabase
+        .from('report_confirmations')
+        .insert({
+          report_id: reportId,
+          user_id: user?.id,
+          confirmation_type: 'confirm'
+        });
+
+      if (confirmationError) {
+        // Check if user already confirmed
+        if (confirmationError.code === '23505') {
+          toast({
+            title: "Already Confirmed",
+            description: "You have already confirmed this report.",
+          });
+          return;
+        }
+        throw confirmationError;
+      }
+
+      toast({
+        title: "Report Confirmed",
+        description: "Thank you for confirming this hazard report.",
+      });
+
+      // Refresh the report to show updated confirmation count
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+      console.error('Error confirming report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to confirm report. Please try again.",
         variant: "destructive"
       });
     }
@@ -315,26 +371,46 @@ const ReportDetail: React.FC<ReportDetailProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-2">
             <Button
               onClick={handleConfirm}
               disabled={userConfirmed}
-              className="flex-1"
               variant={userConfirmed ? "secondary" : "default"}
+              className="flex-1"
             >
               <CheckCircle className="w-4 h-4 mr-2" />
-              {userConfirmed ? 'Confirmed' : 'Confirm Hazard'}
+              {userConfirmed ? 'Confirmed' : 'Confirm'} 
+              {confirmations > 0 && ` (${confirmations})`}
             </Button>
+            
             <Button
               onClick={handleFlag}
-              variant="outline"
+              disabled={userFlagged}
+              variant={userFlagged ? "secondary" : "outline"}
               className="flex-1"
-              disabled={report.status === 'flagged'}
             >
               <Flag className="w-4 h-4 mr-2" />
-              {report.status === 'flagged' ? 'Flagged' : 'Flag Report'}
+              {userFlagged ? 'Flagged' : 'Flag'} 
+              {flags > 0 && ` (${flags})`}
             </Button>
           </div>
+
+          {/* Community Status */}
+          {(confirmations > 0 || flags > 0) && (
+            <div className="bg-muted/30 p-3 rounded-lg">
+              <h4 className="font-medium text-sm mb-2">Community Response</h4>
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span>{confirmations} confirmation{confirmations !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Flag className="w-4 h-4 text-yellow-600" />
+                  <span>{flags} flag{flags !== 1 ? 's' : ''}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
