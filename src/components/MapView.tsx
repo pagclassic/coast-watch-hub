@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { MapPin, AlertTriangle, Navigation, Plus, Search, Crosshair, Globe } from 'lucide-react';
+import { MapPin, AlertTriangle, Navigation, Plus, Search, Crosshair, Globe, X, Map } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 // Import Leaflet CSS
@@ -790,72 +790,79 @@ const MapView: React.FC<MapViewProps> = React.memo(({ onReportClick, onMarkerCli
       )}
 
             {/* Map Legend - Replaced with Info Button */}
-      <Card className="absolute top-4 left-4 z-10 shadow-lg legend-container">
+      <Card className="absolute top-4 left-4 z-10 shadow-lg legend-container max-w-[280px] lg:max-w-none">
         <CardContent className="p-2">
           <Button
             size="sm"
             variant="outline"
             onClick={() => setShowLegend(!showLegend)}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 lg:h-10 lg:w-auto lg:px-3"
             title="Hazard Information"
           >
             <AlertTriangle className="w-4 h-4" />
+            <span className="hidden lg:inline ml-2">Info</span>
           </Button>
           
           {/* Legend Dropdown */}
           {showLegend && (
-            <div className="absolute top-12 left-0 bg-background border rounded-lg shadow-lg p-3 min-w-64 z-20">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-medium text-sm">Hazard Severity & Areas</h4>
-                <div className="flex gap-1">
-                  <Button
-                    size="sm"
-                    variant={showOnlyCritical ? "default" : "outline"}
-                    onClick={() => setShowOnlyCritical(!showOnlyCritical)}
-                    className="h-6 text-xs"
-                  >
-                    {showOnlyCritical ? "All" : "Critical Only"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={showHazardAreas ? "default" : "outline"}
-                    onClick={() => setShowHazardAreas(!showHazardAreas)}
-                    className="h-6 text-xs"
-                  >
-                    {showHazardAreas ? "Hide" : "Show"} Areas
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="space-y-2 text-xs">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-red-600"></div>
-                    <span>Critical (4-5)</span>
+            <div className="absolute top-12 left-0 bg-background border rounded-lg shadow-lg p-3 min-w-64 z-20 max-h-[80vh] overflow-y-auto">
+              <div className="space-y-3">
+                <div>
+                  <h3 className="font-semibold text-sm mb-2">Hazard Severity & Areas</h3>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                      <span>Critical (4-5) - 2km radius area</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                      <span>High (3) - 1.5km radius area</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                      <span>Medium-Low (1-2) - 1km radius area</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                      <span>Overlapping Areas - Multiple hazards nearby</span>
+                    </div>
                   </div>
-                  <div className="ml-5 text-xs text-muted-foreground">2km radius area</div>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                    <span>High (3)</span>
+                
+                <div className="border-t pt-3">
+                  <h4 className="font-medium text-sm mb-2">Display Options</h4>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showHazardAreas}
+                        onChange={(e) => setShowHazardAreas(e.target.checked)}
+                        className="w-3 h-3"
+                      />
+                      Show hazard areas
+                    </label>
+                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showOnlyCritical}
+                        onChange={(e) => setShowOnlyCritical(e.target.checked)}
+                        className="w-3 h-3"
+                      />
+                      Show critical only
+                    </label>
                   </div>
-                  <div className="ml-5 text-xs text-muted-foreground">1.5km radius area</div>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                    <span>Medium-Low (1-2)</span>
+                
+                {calculateTotalAffectedArea() > 0 && (
+                  <div className="border-t pt-3">
+                    <div className="text-xs">
+                      <span className="font-medium">Total Affected Area:</span>
+                      <div className="text-primary font-semibold">
+                        {(calculateTotalAffectedArea() / 1000000).toFixed(1)} km²
+                      </div>
+                    </div>
                   </div>
-                  <div className="ml-5 text-xs text-muted-foreground">1km radius area</div>
-                </div>
-                <div className="pt-2 border-t border-border/50">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <span>Overlapping Areas</span>
-                  </div>
-                  <div className="ml-5 text-xs text-muted-foreground">Multiple hazards nearby</div>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -893,6 +900,72 @@ const MapView: React.FC<MapViewProps> = React.memo(({ onReportClick, onMarkerCli
           </div>
         </CardContent>
       </Card>
+
+      {/* Add mobile-friendly search controls */}
+      <div className="absolute top-4 right-4 z-10 space-y-2">
+        {/* Search Box */}
+        <Card className="shadow-lg w-64 lg:w-80">
+          <CardContent className="p-2">
+            <div className="relative">
+              <Input
+                placeholder="Search location..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pr-8 text-sm"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSearch}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              )}
+            </div>
+            
+            {/* Search Results */}
+            {searchResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 bg-background border rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto z-20">
+                {searchResults.map((result, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSearchResultClick(result)}
+                    className="w-full text-left p-2 hover:bg-muted text-xs border-b last:border-b-0"
+                  >
+                    <div className="font-medium">{result.name}</div>
+                    <div className="text-muted-foreground">{result.display_name}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* Navigation Controls */}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={returnToUserLocation}
+            className="h-8 w-8 p-0 lg:h-10 lg:w-auto lg:px-3"
+            title="Return to my location"
+          >
+            <MapPin className="w-4 h-4" />
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => moveMapTo(37.7749, -122.4194)}
+            className="h-8 w-8 p-0 lg:h-10 lg:w-auto lg:px-3"
+            title="Go to San Francisco"
+          >
+            <Map className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
 
 
     </div>

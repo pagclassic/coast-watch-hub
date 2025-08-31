@@ -2,218 +2,440 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Force Leaflet map to be fully interactive */
+/* Custom CSS Variables */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222.2 84% 4.9%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222.2 84% 4.9%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217.2 91.2% 59.8%;
+  --primary-foreground: 222.2 84% 4.9%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 224.3 76.3% 94.1%;
+}
+
+/* Base Styles */
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+}
+
+/* Mobile-First Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Touch-friendly button sizes */
+  button, .btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Mobile-optimized form inputs */
+  input, textarea, select {
+    font-size: 16px; /* Prevents zoom on iOS */
+    min-height: 44px;
+  }
+  
+  /* Mobile-friendly spacing */
+  .space-y-4 > * + * {
+    margin-top: 1rem;
+  }
+  
+  .space-y-6 > * + * {
+    margin-top: 1.5rem;
+  }
+}
+
+/* Leaflet Map Mobile Optimizations */
 .leaflet-container {
   pointer-events: auto !important;
   touch-action: manipulation !important;
-  user-select: none !important;
 }
 
-.leaflet-map-pane,
-.leaflet-tile-pane,
-.leaflet-overlay-pane,
-.leaflet-marker-pane,
-.leaflet-shadow-pane,
-.leaflet-tooltip-pane,
-.leaflet-popup-pane {
+.leaflet-pane {
   pointer-events: auto !important;
+  touch-action: manipulation !important;
 }
 
-.leaflet-zoom-animated {
+.leaflet-control {
   pointer-events: auto !important;
+  touch-action: manipulation !important;
 }
 
-/* Ensure map container is interactive */
-#map-container {
+.leaflet-control-zoom {
   pointer-events: auto !important;
+  touch-action: manipulation !important;
 }
 
-#map-container .leaflet-container {
+.leaflet-control-attribution {
   pointer-events: auto !important;
+  touch-action: manipulation !important;
 }
 
-@layer base {
-  :root {
-    /* Maritime Color Palette */
-    --background: 210 30% 98%;
-    --foreground: 215 25% 15%;
-    --card: 210 30% 100%;
-    --card-foreground: 215 25% 15%;
-    --popover: 210 30% 100%;
-    --popover-foreground: 215 25% 15%;
-    
-    /* Ocean Blue Primary */
-    --primary: 206 100% 50%;
-    --primary-foreground: 210 30% 98%;
-    --primary-variant: 210 100% 65%;
-    
-    /* Seafoam Secondary */
-    --secondary: 174 45% 85%;
-    --secondary-foreground: 215 25% 15%;
-    
-    /* Neutral Tones */
-    --muted: 210 20% 92%;
-    --muted-foreground: 215 15% 45%;
-    --accent: 195 50% 90%;
-    --accent-foreground: 215 25% 15%;
-    
-    /* Status Colors */
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 30% 98%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 215 25% 15%;
-    --success: 142 76% 36%;
-    --success-foreground: 210 30% 98%;
-    
-    /* UI Elements */
-    --border: 214 20% 88%;
-    --input: 214 20% 88%;
-    --ring: 206 100% 50%;
-    --radius: 8px;
-    
-    /* Gradients */
-    --gradient-ocean: linear-gradient(135deg, hsl(206 100% 50%), hsl(210 100% 65%));
-    --gradient-wave: linear-gradient(180deg, hsl(174 45% 85%), hsl(195 50% 90%));
-    --gradient-sunset: linear-gradient(135deg, hsl(38 92% 50%), hsl(0 84% 60%));
-    
-    /* Shadows */
-    --shadow-ocean: 0 10px 30px -10px hsl(206 100% 50% / 0.3);
-    --shadow-soft: 0 4px 12px -2px hsl(215 25% 15% / 0.1);
-    --shadow-elevated: 0 8px 25px -5px hsl(215 25% 15% / 0.15);
-    
-    /* Sidebar */
-    --sidebar-background: 210 25% 96%;
-    --sidebar-foreground: 215 25% 25%;
-    --sidebar-primary: 206 100% 50%;
-    --sidebar-primary-foreground: 210 30% 98%;
-    --sidebar-accent: 195 50% 90%;
-    --sidebar-accent-foreground: 215 25% 15%;
-    --sidebar-border: 214 20% 88%;
-    --sidebar-ring: 206 100% 50%;
+/* Mobile-friendly map controls */
+@media (max-width: 768px) {
+  .leaflet-control-zoom {
+    transform: scale(0.9);
   }
-
-  .dark {
-    /* Dark Maritime Theme */
-    --background: 215 28% 8%;
-    --foreground: 210 30% 92%;
-    --card: 215 28% 10%;
-    --card-foreground: 210 30% 92%;
-    --popover: 215 28% 10%;
-    --popover-foreground: 210 30% 92%;
-    
-    /* Bright Ocean Blue for Dark Mode */
-    --primary: 195 100% 60%;
-    --primary-foreground: 215 28% 8%;
-    --primary-variant: 200 100% 70%;
-    
-    /* Dark Seafoam */
-    --secondary: 174 30% 25%;
-    --secondary-foreground: 210 30% 92%;
-    
-    /* Dark Neutrals */
-    --muted: 215 25% 15%;
-    --muted-foreground: 210 20% 60%;
-    --accent: 195 40% 20%;
-    --accent-foreground: 210 30% 92%;
-    
-    /* Dark Status Colors */
-    --destructive: 0 75% 55%;
-    --destructive-foreground: 210 30% 92%;
-    --warning: 38 85% 55%;
-    --warning-foreground: 215 28% 8%;
-    --success: 142 65% 45%;
-    --success-foreground: 210 30% 92%;
-    
-    /* Dark UI Elements */
-    --border: 215 25% 18%;
-    --input: 215 25% 18%;
-    --ring: 195 100% 60%;
-    
-    /* Dark Gradients */
-    --gradient-ocean: linear-gradient(135deg, hsl(195 100% 60%), hsl(200 100% 70%));
-    --gradient-wave: linear-gradient(180deg, hsl(174 30% 25%), hsl(195 40% 20%));
-    --gradient-sunset: linear-gradient(135deg, hsl(38 85% 55%), hsl(0 75% 55%));
-    
-    /* Dark Shadows */
-    --shadow-ocean: 0 10px 30px -10px hsl(195 100% 60% / 0.4);
-    --shadow-soft: 0 4px 12px -2px hsl(215 28% 8% / 0.3);
-    --shadow-elevated: 0 8px 25px -5px hsl(215 28% 8% / 0.4);
-    
-    /* Dark Sidebar */
-    --sidebar-background: 215 25% 12%;
-    --sidebar-foreground: 210 30% 85%;
-    --sidebar-primary: 195 100% 60%;
-    --sidebar-primary-foreground: 215 28% 8%;
-    --sidebar-accent: 195 40% 20%;
-    --sidebar-accent-foreground: 210 30% 92%;
-    --sidebar-border: 215 25% 18%;
-    --sidebar-ring: 195 100% 60%;
+  
+  .leaflet-control-zoom a {
+    width: 44px !important;
+    height: 44px !important;
+    line-height: 44px !important;
+    font-size: 18px !important;
+  }
+  
+  .leaflet-control-attribution {
+    font-size: 10px !important;
+    padding: 4px !important;
   }
 }
 
-@layer base {
-  * {
-    @apply border-border;
+/* Mobile-optimized cards */
+@media (max-width: 768px) {
+  .card {
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   }
   
-  body {
-    @apply bg-background text-foreground font-sans antialiased;
+  .card-header {
+    padding: 1rem;
   }
   
-  html {
-    scroll-behavior: smooth;
+  .card-content {
+    padding: 1rem;
   }
 }
 
-@layer components {
-  /* Ocean-inspired animations */
-  .wave-animation {
-    background: linear-gradient(-45deg, hsl(var(--primary)), hsl(var(--primary-variant)), hsl(var(--accent)), hsl(var(--secondary)));
-    background-size: 400% 400%;
-    animation: wave 8s ease-in-out infinite;
+/* Mobile-friendly buttons */
+@media (max-width: 768px) {
+  .btn-mobile {
+    height: 48px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 12px;
   }
   
-  @keyframes wave {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
+  .btn-mobile-sm {
+    height: 40px;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+}
+
+/* Mobile-optimized modals */
+@media (max-width: 768px) {
+  .modal-mobile {
+    margin: 0;
+    border-radius: 0;
+    min-height: 100vh;
   }
   
-  /* Floating elements */
-  .float {
-    animation: float 3s ease-in-out infinite;
+  .modal-mobile .modal-header {
+    padding: 1rem;
+    border-bottom: 1px solid hsl(var(--border));
   }
   
-  @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-10px); }
+  .modal-mobile .modal-content {
+    padding: 1rem;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+  }
+}
+
+/* Touch-friendly interactive elements */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.touch-target-sm {
+  min-height: 32px;
+  min-width: 32px;
+}
+
+/* Mobile-optimized spacing */
+.mobile-p-4 {
+  padding: 1rem;
+}
+
+.mobile-p-6 {
+  padding: 1.5rem;
+}
+
+.mobile-m-4 {
+  margin: 1rem;
+}
+
+.mobile-m-6 {
+  margin: 1.5rem;
+}
+
+/* Mobile-friendly grid layouts */
+@media (max-width: 768px) {
+  .mobile-grid-1 {
+    grid-template-columns: 1fr;
   }
   
-  /* Maritime glow effects */
-  .ocean-glow {
-    box-shadow: var(--shadow-ocean);
+  .mobile-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
   }
   
-  /* Ripple effect for buttons */
-  .ripple {
+  .mobile-flex-col {
+    flex-direction: column;
+  }
+  
+  .mobile-text-center {
+    text-align: center;
+  }
+}
+
+/* Mobile-optimized text sizes */
+@media (max-width: 768px) {
+  .mobile-text-sm {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  
+  .mobile-text-base {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+  
+  .mobile-text-lg {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+  
+  .mobile-text-xl {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+}
+
+/* Mobile-friendly shadows */
+@media (max-width: 768px) {
+  .mobile-shadow-sm {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  }
+  
+  .mobile-shadow {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  }
+  
+  .mobile-shadow-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+}
+
+/* Mobile-optimized animations */
+@media (max-width: 768px) {
+  .mobile-transition {
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .mobile-transform {
+    transform: translateZ(0);
+  }
+}
+
+/* Mobile-friendly focus states */
+@media (max-width: 768px) {
+  .mobile-focus:focus {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+  }
+  
+  .mobile-focus-visible:focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+  }
+}
+
+/* Mobile-optimized scrollbars */
+@media (max-width: 768px) {
+  .mobile-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground)) transparent;
+  }
+  
+  .mobile-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .mobile-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .mobile-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground));
+    border-radius: 3px;
+  }
+}
+
+/* Mobile-friendly hover states */
+@media (hover: none) {
+  .mobile-hover\:bg-primary:hover {
+    background-color: hsl(var(--primary));
+  }
+  
+  .mobile-hover\:bg-muted:hover {
+    background-color: hsl(var(--muted));
+  }
+  
+  .mobile-hover\:scale-105:hover {
+    transform: scale(1.05);
+  }
+}
+
+/* Mobile-optimized form elements */
+@media (max-width: 768px) {
+  .mobile-form-input {
+    border-radius: 8px;
+    border-width: 1px;
+    padding: 12px;
+    font-size: 16px;
+  }
+  
+  .mobile-form-label {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+  
+  .mobile-form-error {
+    font-size: 12px;
+    color: hsl(var(--destructive));
+    margin-top: 4px;
+  }
+}
+
+/* Mobile-friendly navigation */
+@media (max-width: 768px) {
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: hsl(var(--background));
+    border-top: 1px solid hsl(var(--border));
+    padding: 0.5rem;
+    z-index: 50;
+  }
+  
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: background-color 0.2s;
+  }
+  
+  .mobile-nav-item.active {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+}
+
+/* Mobile-optimized tables */
+@media (max-width: 768px) {
+  .mobile-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  .mobile-table th,
+  .mobile-table td {
+    padding: 8px;
+    font-size: 14px;
+  }
+}
+
+/* Mobile-friendly tooltips */
+@media (max-width: 768px) {
+  .mobile-tooltip {
     position: relative;
-    overflow: hidden;
   }
   
-  .ripple::before {
-    content: '';
+  .mobile-tooltip:hover::after {
+    content: attr(data-tooltip);
     position: absolute;
-    top: 50%;
+    bottom: 100%;
     left: 50%;
-    width: 0;
-    height: 0;
-    border-radius: 50%;
-    background: hsl(var(--primary-foreground) / 0.3);
-    transform: translate(-50%, -50%);
-    transition: width 0.6s, height 0.6s;
+    transform: translateX(-50%);
+    background: hsl(var(--foreground));
+    color: hsl(var(--background));
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1000;
+  }
+}
+
+/* Mobile-optimized loading states */
+@media (max-width: 768px) {
+  .mobile-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
   }
   
-  .ripple:active::before {
-    width: 300px;
-    height: 300px;
+  .mobile-loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid hsl(var(--muted));
+    border-top: 3px solid hsl(var(--primary));
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
   }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
